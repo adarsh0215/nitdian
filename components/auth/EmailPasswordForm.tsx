@@ -15,7 +15,7 @@ type ActionState = { ok: false; error: string } | null;
 function SubmitButton({ mode }: { mode: "login" | "signup" }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
+    <Button type="submit" className="w-full" disabled={pending} aria-disabled={pending}>
       {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -35,16 +35,41 @@ export default function EmailPasswordForm({
   mode: "login" | "signup";
   next?: string;
 }) {
+  // Choose the server action. These redirect on success; return { ok:false, error } on failure.
   const serverAction =
     mode === "login" ? signInWithPassword : signUpWithPassword;
 
-  // Adapter to match useActionState signature
+  // Adapter: normalize server action result -> ActionState
   const action = React.useCallback(
     async (_state: ActionState, formData: FormData): Promise<ActionState> => {
-      // delegate to server action; it returns { ok:false, error } or redirects
-      return await serverAction(null, formData);
+      try {
+        // Ensure next is always sent; safe redirect logic happens server-side
+        if (!formData.get("next")) {
+          formData.set("next", next ?? "");
+        }
+
+        // The server action either redirects (never returns) or returns { ok:false, error }
+        const res: unknown = await serverAction(null, formData);
+
+        // If we got an object like { ok:false, error }, surface it
+        if (
+          res &&
+          typeof res === "object" &&
+          "ok" in (res as any) &&
+          (res as any).ok === false &&
+          typeof (res as any).error === "string"
+        ) {
+          return res as { ok: false; error: string };
+        }
+
+        // Any other case means success (redirect already happened or will happen),
+        // so keep the client state null.
+        return null;
+      } catch (e: any) {
+        return { ok: false, error: e?.message ?? "Unexpected error" };
+      }
     },
-    [serverAction]
+    [serverAction, next]
   );
 
   const [state, formAction] = React.useActionState<ActionState, FormData>(
@@ -55,6 +80,7 @@ export default function EmailPasswordForm({
   const [revealed, setRevealed] = React.useState(false);
   const emailId = React.useId();
   const pwId = React.useId();
+  const errId = React.useId();
 
   return (
     <form action={formAction} className="space-y-4" noValidate>
@@ -67,9 +93,11 @@ export default function EmailPasswordForm({
           name="email"
           type="email"
           placeholder="you@alumni.com"
-          autoComplete={mode === "login" ? "email" : "username"}
+          autoComplete="email"
           inputMode="email"
           required
+          aria-invalid={!!state?.error}
+          aria-describedby={state?.error ? errId : undefined}
         />
       </div>
 
@@ -85,6 +113,8 @@ export default function EmailPasswordForm({
             minLength={6}
             required
             className="pr-10"
+            aria-invalid={!!state?.error}
+            aria-describedby={state?.error ? errId : undefined}
           />
           <button
             type="button"
@@ -99,7 +129,7 @@ export default function EmailPasswordForm({
       </div>
 
       {state?.error ? (
-        <p className="text-sm text-destructive" role="alert" aria-live="polite">
+        <p id={errId} className="text-sm text-destructive" role="alert" aria-live="polite">
           {state.error}
         </p>
       ) : null}
