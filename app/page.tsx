@@ -20,13 +20,13 @@ export default function Page() {
   return (
     <main className="min-h-[100dvh] bg-background text-foreground">
       {/* Announcement */}
-      {d.announcement?.enabled && (
+      {/* {d.announcement?.enabled && (
         <AnnouncementBar
           text={d.announcement.text}
           ctaLabel={d.announcement.cta.label}
           ctaHref={d.announcement.cta.href}
         />
-      )}
+      )} */}
 
       {/* Hero */}
       <Hero
@@ -51,7 +51,7 @@ export default function Page() {
       </section>
 
       {/* Quick actions */}
-      <section className="py-8 sm:py-12  min-w-dvh">
+      {/* <section className="py-8 sm:py-12  min-w-dvh">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <QuickActions
             heading={d.quickActionsSection.heading}
@@ -59,7 +59,7 @@ export default function Page() {
             items={d.quickActionsSection.items}
           />
         </div>
-      </section>
+      </section> */}
       {/* Spotlight */}
       <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

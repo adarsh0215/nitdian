@@ -34,7 +34,7 @@ export default function Hero({
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="min-h-[68svh] md:min-h-[78vh] xl:min-h-[92vh] flex items-center justify-center py-14 sm:py-20 md:py-24">
           <div className="max-w-3xl text-center">
-            <Badge className="mb-6 px-2 rounded-full text-sm bg-background text-primary">{microProof}</Badge>
+            {/* <Badge className="mb-6 px-2 rounded-full text-sm bg-background text-primary">{microProof}</Badge> */}
             <h1 className=" text-4xl text-white sm:text-6xl font-semibold tracking-tight mb-4">
               {headline}
             </h1>

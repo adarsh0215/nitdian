@@ -24,7 +24,7 @@ export const HOMEPAGE_DATA = {
   announcement: {
     enabled: true,
     text: "Delhi Chapter Meetup • Sept 14 at India Habitat Centre",
-    cta: { label: "RSVP Now →", href: "/events/delhi-meetup" } satisfies Cta,
+    cta: { label: "", href: "" } satisfies Cta,
   },
   hero: {
     headline: "Connect. Collaborate.  Contribute.",
@@ -34,20 +34,28 @@ export const HOMEPAGE_DATA = {
     microProof: "2,143 alumni and growing",
   },
   brands: {
-    caption: "Our alumni are building at",
+    caption: "Our alumni are crafting future",
     items: [
-      { name: "Google" },
-      { name: "Microsoft" },
-      { name: "Amazon" },
-      { name: "McKinsey" },
-      { name: "Flipkart" },
-      { name: "Adobe" },
-      { name: "Atlassian" },
+      { name: "EY", logoUrl: "/brands/ey-logo.png" },          
+      { name: "Jal Shakti", logoUrl: "/brands/jal-shakti-logo.png" },
+      { name: "Jindal Steel", logoUrl: "/brands/jindal-steel-logo.png" },
+      { name: "NTPC", logoUrl: "/brands/ntpc-logo.png" },
+      { name: "Microsoft", logoUrl: "/brands/microsoft-logo.png" },
+      { name: "Powergrid", logoUrl: "/brands/powergrid-logo.png" },
+      { name: "PWC", logoUrl: "/brands/pwc-logo.png" },
+      { name: "TechMahindra", logoUrl: "/brands/tech-mahindra-logo.png" },
+      { name: "WSP", logoUrl: "/brands/wsp-logo.png" },
+      { name: "OTPC", logoUrl: "/brands/otpc-logo.png" },
+      { name: "Accenture", logoUrl: "/brands/accenture-logo.png" },
+      { name: "HPE", logoUrl: "/brands/hindustan_power_exchange_logo.jpeg" },
+      { name: "Samsung", logoUrl: "/brands/samsung-logo.png" },
+      { name: "GEM", logoUrl: "/brands/gem-logo.png" },
+      { name: "NEA", logoUrl: "/brands/nea-logo.jpg" },
     ] satisfies Brand[],
   },
   valuesSection: {
-    heading: "Why Join the Network?",
-    subheading: "More than a directory — it’s opportunities, mentorship, and belonging.",
+    heading: "Why Join the Alumni Network?",
+    subheading: "More than a Alumni directory — it’s opportunities, mentorship, and belonging. You will find your calling here.",
     items: [
       {
         title: "Networking, Business & Services",
@@ -129,24 +137,50 @@ export const HOMEPAGE_DATA = {
     } satisfies SpotlightEvent,
   },
 
-  testimonialsSection: {
-    heading: "Loved by alumni across batches",
-    subheading: "Referrals, mentorship, and a sense of belonging—straight from the community.",
-    items: [
-      {
-        quote: "Got my next role through an alumni referral here.",
-        author: "Ritwik ’16",
-        role: "SDE @ Microsoft",
-        avatar: "/avatars/ritwik.jpg",
-      },
-      {
-        quote: "Mentoring juniors keeps me connected and inspired.",
-        author: "Shruti ’12",
-        role: "Product @ Google",
-        avatar: "/avatars/shruti.jpg",
-      },
-    ] satisfies TestimonialItem[],
-  },
+  // data.ts
+testimonialsSection: {
+  heading: "Loved by alumni across batches",
+  subheading: "Appreciation, motivation, and encouragement",
+  items: [
+    {
+      quote:
+        "The alumni network helped me land my next role and reconnect with old batchmates.The alumni network helped me land my next role and reconnect with old batchmates.The alumni network helped me land my next role and reconnect with old batchmates.The alumni network helped me land my next role and reconnect with old batchmates.The alumni network helped me land my next role and reconnect with old batchmates",
+      author: "Arvind Choubey",
+      role: "Chairperson, NIT Durgapur",
+      avatar: "/members/director.jpg",
+      href: "/stories/arvind-choubey",
+    },
+    {
+      quote: "Four years of Durgapur - Four decades of Engineering. Nothing less, Nothing more. Four years of Durgapur - Four decades of Engineering. Nothing less, Nothing more.",
+      author: "Hitendra Dev",
+      role: "EE ’88",
+      avatar: "/members/director.jpg",
+      href: "/stories/sandeep-kapoor",
+    },
+    {
+      quote: "Test message… test message…",
+      author: "Sandeep Kapoor",
+      role: "Mech ’87",
+      avatar: "",
+      href: "/stories/sandeep-kapoor",
+    },
+    {
+      quote: "Test message… test message…",
+      author: "Jaya Sood",
+      role: "Mech ’87",
+      avatar: "",
+      href: "/stories/sandeep-kapoor",
+    },
+    {
+      quote: "Test message… test message…",
+      author: "Sandeep Kapoor",
+      role: "Mech ’87",
+      avatar: "",
+      href: "/stories/sandeep-kapoor",
+    },
+  ] satisfies TestimonialItem[],
+},
+
 
   howSection: {
     heading: "How it works",

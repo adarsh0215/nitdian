@@ -1,5 +1,9 @@
 export type Cta = { label: string; href: string };
-export type Brand = { name: string; logoText?: string };
+export type Brand = { 
+  name: string; 
+  logoText?: string;
+  logoUrl?: string;
+  href?: string  };
 export type ValueItem = {
   title: string;
   description: string;
@@ -17,7 +21,8 @@ export type TestimonialItem = {
   quote: string;
   author: string;      // e.g., "Ritwik ’16"
   role?: string;       // e.g., "SDE @ Microsoft"
-  avatar?: string | null; // /public/avatars/ritwik.jpg (optional)
+  avatar?: string | null; 
+  href: string;// /public/avatars/ritwik.jpg (optional)
 };
 export type SpotlightEvent = {
   title: string;
