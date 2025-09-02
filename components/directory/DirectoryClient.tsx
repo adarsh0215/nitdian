@@ -27,57 +27,56 @@ export type DirectoryItem = {
   country: string | null;
 };
 
-const PER_PAGE = 12;
+export type DirectoryInitial = {
+  items: DirectoryItem[];
+  total: number;
+  perPage: number;
+  filters: DirectoryFilters;
+};
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export default function DirectoryClient({
-  initial,
-}: {
-  initial: {
-    items: DirectoryItem[];
-    total: number;
-    perPage: number;
-    filters: DirectoryFilters;
-  };
-}) {
+export default function DirectoryClient({ initial }: { initial: DirectoryInitial }) {
   const [items, setItems] = React.useState<DirectoryItem[]>(initial.items);
   const [total, setTotal] = React.useState(initial.total);
   const [filters, setFilters] = React.useState<DirectoryFilters>(initial.filters);
   const [busy, setBusy] = React.useState(false);
 
-  // --- URL sync --------------------------------------------------------------
+  // honor the server-provided page size
+  const perPage = initial.perPage || 12;
+
+  // URL sync
   const updateUrl = React.useCallback((next: DirectoryFilters) => {
     const url = new URL(window.location.href);
-    const params = url.searchParams;
-    params.set("page", String(next.page));
-    params.set("sort", next.sort);
-    next.q ? params.set("q", next.q) : params.delete("q");
-    next.branch ? params.set("branch", next.branch) : params.delete("branch");
-    next.degree ? params.set("degree", next.degree) : params.delete("degree");
-    next.year ? params.set("year", String(next.year)) : params.delete("year");
-    window.history.replaceState({}, "", `${url.pathname}?${params.toString()}`);
+    const p = url.searchParams;
+    p.set("page", String(next.page));
+    p.set("sort", next.sort);
+    next.q ? p.set("q", next.q) : p.delete("q");
+    next.branch ? p.set("branch", next.branch) : p.delete("branch");
+    next.degree ? p.set("degree", next.degree) : p.delete("degree");
+    next.year ? p.set("year", String(next.year)) : p.delete("year");
+    window.history.replaceState({}, "", `${url.pathname}?${p.toString()}`);
   }, []);
 
   React.useEffect(() => {
     updateUrl(filters);
   }, [filters, updateUrl]);
 
-  // --- Query ---------------------------------------------------------------
+  // fetch page
   const fetchPage = React.useCallback(
     async (page: number) => {
       setBusy(true);
       try {
-        const from = (page - 1) * PER_PAGE;
-        const to = from + PER_PAGE - 1;
+        const from = (page - 1) * perPage;
+        const to = from + perPage - 1;
 
         let q = supabase
           .from("profiles")
           .select(
-            "id, full_name, avatar_url, degree, branch, graduation_year, designation, company, city, country",
+            "id, full_name, avatar_url, degree, branch, graduation_year, designation, company, city, country, created_at",
             { count: "exact" }
           )
           .eq("is_public", true)
@@ -106,28 +105,17 @@ export default function DirectoryClient({
         setBusy(false);
       }
     },
-    [filters]
+    [filters, perPage]
   );
 
   React.useEffect(() => {
-    void fetchPage(filters.page); // call, not expression
+    // explicit call (no “expression statement” warning)
+    fetchPage(filters.page).catch(() => {});
   }, [fetchPage, filters.page]);
 
-  // --- handlers -------------------------------------------------------------
-  const onChangeFilters = (patch: Partial<DirectoryFilters>) => {
+  const onChangeFilters = (patch: Partial<DirectoryFilters>) =>
     setFilters((f) => ({ ...f, ...patch }));
-  };
 
-  const onClearOne = (key: keyof DirectoryFilters) => {
-    const cleared: Partial<DirectoryFilters> =
-      key === "sort" || key === "page" ? {} : { [key]: undefined };
-    setFilters((f) => ({ ...f, ...cleared, page: 1 }));
-  };
-
-  const onClearAll = () =>
-    setFilters({ q: "", branch: undefined, degree: undefined, year: undefined, sort: "name", page: 1 });
-
-  // --- render ---------------------------------------------------------------
   return (
     <div className="space-y-4">
       <FiltersBar initial={filters} onChange={onChangeFilters} busy={busy} />
@@ -140,8 +128,8 @@ export default function DirectoryClient({
 
       <div className="flex items-center justify-between pt-2">
         <div className="text-sm text-muted-foreground">
-          Showing {(filters.page - 1) * PER_PAGE + 1}–
-          {Math.min(filters.page * PER_PAGE, total)} of {total}
+          Showing {(filters.page - 1) * perPage + 1}–
+          {Math.min(filters.page * perPage, total)} of {total}
         </div>
         <div className="flex gap-2">
           <button
@@ -153,7 +141,7 @@ export default function DirectoryClient({
           </button>
           <button
             className="rounded-md border px-3 py-1.5 text-sm disabled:opacity-50"
-            disabled={filters.page * PER_PAGE >= total || busy}
+            disabled={filters.page * perPage >= total || busy}
             onClick={() => onChangeFilters({ page: filters.page + 1 })}
           >
             Next

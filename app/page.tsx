@@ -1,4 +1,3 @@
-import Link from "next/link";
 import AnnouncementBar from "@/components/home/AnnouncementBar";
 import Hero from "@/components/home/Hero";
 import BrandStrip from "@/components/home/BrandStrip";
