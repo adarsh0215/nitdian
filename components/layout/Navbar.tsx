@@ -24,7 +24,6 @@ export default function Navbar() {
   const [loadingUser, setLoadingUser] = React.useState(true);
   const [pill, setPill] = React.useState<UserPillData | null>(null);
 
-  // helper to fetch pill data
   const fetchUser = React.useCallback(async () => {
     try {
       const supabase = supabaseBrowser();
@@ -60,7 +59,6 @@ export default function Navbar() {
     }
   }, []);
 
-  // Load on mount + re-run on auth state change
   React.useEffect(() => {
     const supabase = supabaseBrowser();
 
@@ -70,7 +68,7 @@ export default function Navbar() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
       fetchUser();
-      router.refresh(); // make sure server comps re-render if needed
+      router.refresh();
     });
 
     return () => {
@@ -83,29 +81,26 @@ export default function Navbar() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Logo */}
         <Link
-        href="/"
-        aria-label="NIT Durgapur"
-        className="flex items-center gap-2 md:justify-self-start"
-      >
-        <Image
-          src= "/images/logo.png"
-          alt="Logo"
-          width={40}
-          height={40}
-          className="h-10 w-10 object-contain rounded-lg hairline bg-surface"
-        />
-        <div className="hidden sm:flex flex-col leading-tight min-w-0">
-          <span className="truncate text-base font-semibold tracking-tight">
-            NIT Durgapur
-          </span>
-        
+          href="/"
+          aria-label="NIT Durgapur"
+          className="flex items-center gap-2 md:justify-self-start"
+        >
+          <Image
+            src="/images/logo.png"
+            alt="Logo"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-contain rounded-lg hairline bg-surface"
+          />
+          <div className="hidden sm:flex flex-col leading-tight min-w-0">
+            <span className="truncate text-base font-semibold tracking-tight">
+              NIT Durgapur
+            </span>
             <span className="truncate text-xs sm:text-sm text-muted-foreground">
               International Alumni Network
             </span>
-        
-        </div>
-      </Link>
-
+          </div>
+        </Link>
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-6">
@@ -117,9 +112,7 @@ export default function Navbar() {
                 href={link.href}
                 className={[
                   "text-sm transition-colors hover:text-foreground",
-                  active
-                    ? "text-foreground font-medium"
-                    : "text-muted-foreground",
+                  active ? "text-foreground font-medium" : "text-muted-foreground",
                 ].join(" ")}
               >
                 {link.label}
@@ -137,9 +130,15 @@ export default function Navbar() {
           ) : pill ? (
             <UserPill {...pill} />
           ) : (
-            <Button size="sm" onClick={() => router.push("/login")}>
-              Login
-            </Button>
+            // Show both auth buttons on desktop; hide on mobile (they appear in the sheet)
+            <div className="hidden md:flex items-center gap-2">
+              <Button size="sm" variant="outline" asChild>
+                <Link href="/signup">Sign up</Link>
+              </Button>
+              <Button size="sm" onClick={() => router.push("/login")}>
+                Login
+              </Button>
+            </div>
           )}
 
           {/* Mobile menu toggle */}
@@ -165,9 +164,7 @@ export default function Navbar() {
                   href={link.href}
                   className={[
                     "rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted hover:text-foreground",
-                    active
-                      ? "text-foreground font-medium"
-                      : "text-muted-foreground",
+                    active ? "text-foreground font-medium" : "text-muted-foreground",
                   ].join(" ")}
                   onClick={() => setOpen(false)}
                 >
@@ -181,11 +178,18 @@ export default function Navbar() {
                 Signed in as {pill.email}
               </div>
             ) : (
-              <Button size="sm" className="mt-2 w-full" asChild>
-                <Link href="/login" onClick={() => setOpen(false)}>
-                  Login
-                </Link>
-              </Button>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Button size="sm" variant="outline" asChild>
+                  <Link href="/signup" onClick={() => setOpen(false)}>
+                    Sign up
+                  </Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/login" onClick={() => setOpen(false)}>
+                    Login
+                  </Link>
+                </Button>
+              </div>
             )}
           </nav>
         </div>
