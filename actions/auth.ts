@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { safeRedirect } from "@/lib/redirects";
 
-type ActionResult = { ok: true; url?: string } | { ok: false; error: string };
+type ActionResult = { ok: true; url: string } | { ok: false; error: string };
 
 // Prefer /dashboard unless `next` is a meaningful in-app path.
-// Assumes `safeRedirect` already blocks off-origin values.
+// Assumes `safeRedirect` rejects off-origin values.
 function preferDashboard(p?: string | null) {
   const s = safeRedirect(p ?? undefined);
   return s && s !== "/" ? s : "/dashboard";
@@ -40,10 +40,10 @@ export async function signInWithPassword(
       .maybeSingle();
 
     if (!profile || !profile.onboarded) {
-      redirect("/onboarding");
+      redirect("/onboarding"); // never returns
     }
 
-    redirect(preferDashboard(nextRaw));
+    redirect(preferDashboard(nextRaw)); // never returns
   } catch (e: any) {
     return { ok: false, error: e?.message ?? "Unexpected error" };
   }
@@ -62,7 +62,7 @@ export async function signUpWithPassword(
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) return { ok: false, error: error.message };
 
-    redirect("/onboarding");
+    redirect("/onboarding"); // never returns
   } catch (e: any) {
     return { ok: false, error: e?.message ?? "Unexpected error" };
   }
@@ -73,7 +73,7 @@ export async function signInWithGoogle(
   formData: FormData
 ): Promise<ActionResult> {
   try {
-    // Build a stable origin for redirectTo (works locally, on Vercel, etc.)
+    // Build origin that works locally / on Vercel
     const h = await headers();
     const host = h.get("x-forwarded-host") || h.get("host") || "localhost:3000";
     const proto =
@@ -89,7 +89,7 @@ export async function signInWithGoogle(
       provider: "google",
       options: {
         redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`,
-        // Optional UX tweak:
+        // optional UX:
         queryParams: { prompt: "select_account" },
       },
     });
@@ -97,6 +97,7 @@ export async function signInWithGoogle(
     if (error) return { ok: false, error: error.message || "OAuth init failed" };
     if (!data?.url) return { ok: false, error: "No redirect URL returned" };
 
+    // ✅ url is guaranteed here, matches GoogleState expectation on the client
     return { ok: true, url: data.url };
   } catch (e: any) {
     return { ok: false, error: e?.message ?? "Unexpected error" };
