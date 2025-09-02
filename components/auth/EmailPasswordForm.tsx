@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useFormStatus } from "react-dom";
 
-// For email+password we only ever render an error from the action.
-// On success we redirect and never render a success state.
+// The server actions redirect on success; on failure they return { ok:false, error }.
+// That's the only state we render in the form.
 type ActionState = { ok: false; error: string } | null;
 
 function SubmitButton({ mode }: { mode: "login" | "signup" }) {
@@ -35,38 +35,35 @@ export default function EmailPasswordForm({
   mode: "login" | "signup";
   next?: string;
 }) {
-  // Choose the server action. These redirect on success; return { ok:false, error } on failure.
   const serverAction =
     mode === "login" ? signInWithPassword : signUpWithPassword;
 
-  // Adapter: normalize server action result -> ActionState
+  // Type guard for server action failure shape (no `any` used)
+  function isErrorResult(val: unknown): val is { ok: false; error: string } {
+    if (typeof val !== "object" || val === null) return false;
+    const v = val as Record<string, unknown>;
+    return v.ok === false && typeof v.error === "string";
+  }
+
+  // Adapter to normalize server action output -> ActionState
   const action = React.useCallback(
     async (_state: ActionState, formData: FormData): Promise<ActionState> => {
       try {
-        // Ensure next is always sent; safe redirect logic happens server-side
-        if (!formData.get("next")) {
-          formData.set("next", next ?? "");
-        }
+        // ensure `next` is always sent; server decides where to send user
+        if (!formData.get("next")) formData.set("next", next ?? "");
 
         // The server action either redirects (never returns) or returns { ok:false, error }
-        const res: unknown = await serverAction(null, formData);
+        const res = await serverAction(null as unknown as never, formData);
 
-        // If we got an object like { ok:false, error }, surface it
-        if (
-          res &&
-          typeof res === "object" &&
-          "ok" in (res as any) &&
-          (res as any).ok === false &&
-          typeof (res as any).error === "string"
-        ) {
-          return res as { ok: false; error: string };
+        if (isErrorResult(res)) {
+          return res; // show the error inline
         }
 
-        // Any other case means success (redirect already happened or will happen),
-        // so keep the client state null.
+        // success -> redirect already happened; keep local state empty
         return null;
-      } catch (e: any) {
-        return { ok: false, error: e?.message ?? "Unexpected error" };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Unexpected error";
+        return { ok: false, error: message };
       }
     },
     [serverAction, next]
