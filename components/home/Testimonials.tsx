@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { TestimonialItem } from "./types";
 
@@ -28,18 +27,35 @@ export default function Testimonials({
       {/* Featured */}
       <Featured item={featured} />
 
-      {/* Small cards */}
-      {/* Mobile: horizontal swipe */}
-      <div className="sm:hidden -mx-4 px-4 overflow-x-auto no-scrollbar">
-        <div className="flex gap-4">
-          {rest.map((t, i) => (
-            <Small key={i} item={t} />
-          ))}
+      {/* Mobile carousel (one full card visible + next peeking) */}
+      <div className="sm:hidden -mx-4 px-4">
+        <div className="relative">
+          <div
+            className="
+              flex gap-4 overflow-x-auto scroll-smooth no-scrollbar py-1
+              snap-x snap-mandatory [scroll-padding-inline:1rem]
+            "
+          >
+            {rest.map((t, i) => (
+              <Small
+                key={i}
+                item={t}
+                className="
+                  snap-start
+                  min-w-[calc(100%_-_3.5rem)]  /* one full card + peek of next */
+                "
+              />
+            ))}
+          </div>
+
+          {/* soft edge fades */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
         </div>
       </div>
 
-      {/* Desktop: tidy grid */}
-      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Desktop: equal-height grid */}
+      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-4 [grid-auto-rows:1fr] items-stretch">
         {rest.map((t, i) => (
           <Small key={i} item={t} />
         ))}
@@ -150,9 +166,14 @@ function Featured({ item }: { item: TestimonialItem }) {
   );
 }
 
-
 /* ---------------- Small cards ---------------- */
-function Small({ item }: { item: TestimonialItem }) {
+function Small({
+  item,
+  className = "",
+}: {
+  item: TestimonialItem;
+  className?: string;
+}) {
   const [expanded, setExpanded] = React.useState(false);
   const [collapsedMax, setCollapsedMax] = React.useState(0);   // 4 lines
   const [contentHeight, setContentHeight] = React.useState(0);
@@ -183,14 +204,15 @@ function Small({ item }: { item: TestimonialItem }) {
 
   return (
     <article
-      className="
-        rounded-2xl border border-border bg-card
-        p-4 sm:p-5 w-full h-full
-        transition-all duration-300 hover:shadow-md hover:-translate-y-0.5
-        flex flex-col
-      "
+      className={[
+        "rounded-2xl border border-border bg-card p-4 sm:p-5 w-full h-full",
+        "transition-all duration-300 hover:shadow-md hover:-translate-y-0.5",
+        "flex flex-col",
+        "min-h-[16rem] sm:min-h-[15rem]", // consistent baseline height
+        className,
+      ].join(" ")}
     >
-      {/* Quote */}
+      {/* Quote (animated height) */}
       <div className="relative min-w-0">
         <div
           ref={contentRef}
@@ -212,7 +234,7 @@ function Small({ item }: { item: TestimonialItem }) {
         )}
       </div>
 
-      {/* Toggle */}
+      {/* Toggle — right aligned */}
       {canExpand && (
         <button
           type="button"
@@ -233,7 +255,6 @@ function Small({ item }: { item: TestimonialItem }) {
               {initials(item.author)}
             </AvatarFallback>
           </Avatar>
-
           <div className="min-w-0">
             <div className="text-sm sm:text-base font-medium leading-tight truncate">
               {item.author}
@@ -249,8 +270,6 @@ function Small({ item }: { item: TestimonialItem }) {
     </article>
   );
 }
-
-
 
 /* Helpers */
 function initials(name: string) {
