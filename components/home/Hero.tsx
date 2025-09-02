@@ -1,18 +1,17 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Badge } from "../ui/badge";
 
 export default function Hero({
   headline,
   subtext,
   primary,
-  secondary,
   microProof,
 }: {
   headline: string;
   subtext: string;
   primary: { label: string; href: string };
-  secondary: { label: string; href: string };
   microProof: string;
 }) {
   return (
@@ -35,7 +34,8 @@ export default function Hero({
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="min-h-[68svh] md:min-h-[78vh] xl:min-h-[92vh] flex items-center justify-center py-14 sm:py-20 md:py-24">
           <div className="max-w-3xl text-center">
-            <h1 className="text-4xl text-white sm:text-6xl font-semibold tracking-tight mb-4">
+            <Badge className="mb-6 px-2 rounded-full text-sm bg-background text-primary">{microProof}</Badge>
+            <h1 className=" text-4xl text-white sm:text-6xl font-semibold tracking-tight mb-4">
               {headline}
             </h1>
             <p className="text-base text-[#EAEAEA] sm:text-lg  mb-8">
@@ -46,12 +46,9 @@ export default function Hero({
               <Button asChild size="lg">
                 <Link href={primary.href}>{primary.label}</Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href={secondary.href}>{secondary.label}</Link>
-              </Button>
             </div>
-
-            <p className="mt-6 text-sm text-[#d4d4d4]">{microProof}</p>
+            
+      
           </div>
         </div>
       </div>

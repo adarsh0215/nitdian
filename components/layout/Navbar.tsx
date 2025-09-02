@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,58 +24,88 @@ export default function Navbar() {
   const [loadingUser, setLoadingUser] = React.useState(true);
   const [pill, setPill] = React.useState<UserPillData | null>(null);
 
-  // Load current user + profile (avatar/name) from Supabase on mount
-  React.useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const supabase = supabaseBrowser();
-        const { data: userRes } = await supabase.auth.getUser();
-        const user = userRes?.user ?? null;
+  // helper to fetch pill data
+  const fetchUser = React.useCallback(async () => {
+    try {
+      const supabase = supabaseBrowser();
+      const { data: userRes } = await supabase.auth.getUser();
+      const user = userRes?.user ?? null;
 
-        if (!user) {
-          if (alive) {
-            setPill(null);
-            setLoadingUser(false);
-          }
-          return;
-        }
-
-        // Try to read from your `profiles` table for prettier pill data
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name, avatar_url, email")
-          .eq("id", user.id)
-          .single();
-
-        const name = profile?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Member";
-        const email = profile?.email || user.email || "";
-        const avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url || null;
-
-        if (alive) {
-          setPill({ name, email, avatarUrl });
-          setLoadingUser(false);
-        }
-      } catch {
-        if (alive) {
-          setPill(null);
-          setLoadingUser(false);
-        }
+      if (!user) {
+        setPill(null);
+        setLoadingUser(false);
+        return;
       }
-    })();
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, avatar_url, email")
+        .eq("id", user.id)
+        .single();
+
+      const name =
+        profile?.full_name ||
+        user.user_metadata?.full_name ||
+        user.email?.split("@")[0] ||
+        "Member";
+      const email = profile?.email || user.email || "";
+      const avatarUrl =
+        profile?.avatar_url || user.user_metadata?.avatar_url || null;
+
+      setPill({ name, email, avatarUrl });
+      setLoadingUser(false);
+    } catch {
+      setPill(null);
+      setLoadingUser(false);
+    }
+  }, []);
+
+  // Load on mount + re-run on auth state change
+  React.useEffect(() => {
+    const supabase = supabaseBrowser();
+
+    fetchUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      fetchUser();
+      router.refresh(); // make sure server comps re-render if needed
+    });
 
     return () => {
-      alive = false;
+      subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchUser, router]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Logo */}
-        <Link href="/" className="font-semibold text-lg tracking-tight">
-          NITDIAN
-        </Link>
+        <Link
+        href="/"
+        aria-label="NIT Durgapur"
+        className="flex items-center gap-2 md:justify-self-start"
+      >
+        <Image
+          src= "/images/logo.png"
+          alt="Logo"
+          width={40}
+          height={40}
+          className="h-10 w-10 object-contain rounded-lg hairline bg-surface"
+        />
+        <div className="hidden sm:flex flex-col leading-tight min-w-0">
+          <span className="truncate text-base font-semibold tracking-tight">
+            NIT Durgapur
+          </span>
+        
+            <span className="truncate text-xs sm:text-sm text-muted-foreground">
+              International Alumni Network
+            </span>
+        
+        </div>
+      </Link>
+
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-6">
@@ -86,7 +117,9 @@ export default function Navbar() {
                 href={link.href}
                 className={[
                   "text-sm transition-colors hover:text-foreground",
-                  active ? "text-foreground font-medium" : "text-muted-foreground",
+                  active
+                    ? "text-foreground font-medium"
+                    : "text-muted-foreground",
                 ].join(" ")}
               >
                 {link.label}
@@ -100,7 +133,6 @@ export default function Navbar() {
           <ThemeSwitcher />
 
           {loadingUser ? (
-            // tiny skeleton while session loads
             <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
           ) : pill ? (
             <UserPill {...pill} />
@@ -133,7 +165,9 @@ export default function Navbar() {
                   href={link.href}
                   className={[
                     "rounded-md px-3 py-2 text-sm transition-colors hover:bg-muted hover:text-foreground",
-                    active ? "text-foreground font-medium" : "text-muted-foreground",
+                    active
+                      ? "text-foreground font-medium"
+                      : "text-muted-foreground",
                   ].join(" ")}
                   onClick={() => setOpen(false)}
                 >
@@ -143,7 +177,9 @@ export default function Navbar() {
             })}
 
             {pill ? (
-              <div className="pt-2 text-xs text-muted-foreground">Signed in as {pill.email}</div>
+              <div className="pt-2 text-xs text-muted-foreground">
+                Signed in as {pill.email}
+              </div>
             ) : (
               <Button size="sm" className="mt-2 w-full" asChild>
                 <Link href="/login" onClick={() => setOpen(false)}>

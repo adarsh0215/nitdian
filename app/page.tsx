@@ -34,10 +34,6 @@ export default function Page() {
         headline={d.hero.headline}
         subtext={d.hero.subtext}
         primary={{ label: d.hero.primary.label, href: d.hero.primary.href }}
-        secondary={{
-          label: d.hero.secondary.label,
-          href: d.hero.secondary.href,
-        }}
         microProof={d.hero.microProof}
       />
 

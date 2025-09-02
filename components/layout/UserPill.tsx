@@ -22,6 +22,7 @@ export type UserPillData = {
 
 export default function UserPill({ name, email, avatarUrl }: UserPillData) {
   const router = useRouter();
+  const [signingOut, setSigningOut] = React.useState(false);
 
   const initials = React.useMemo(() => {
     const parts = (name || "").trim().split(/\s+/);
@@ -31,18 +32,42 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
   }, [name, email]);
 
   const onSignOut = async () => {
-    const supabase = supabaseBrowser();
-    await supabase.auth.signOut();
-    router.refresh();
-    router.push("/login");
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const supabase = supabaseBrowser();
+
+      // 1) Clear client auth (and broadcast to other tabs)
+      await supabase.auth.signOut({ scope: "global" });
+
+      // 2) Clear server HttpOnly cookies (your route handler does the clearing)
+      await fetch("/auth/callback/signout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      // 3) Refresh UI and go to login
+      router.refresh();
+      router.push("/login");
+    } catch {
+      router.refresh();
+    } finally {
+      setSigningOut(false);
+    }
   };
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1.5 text-sm hover:bg-muted transition-colors">
+      <DropdownMenuTrigger
+        className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1.5 text-sm hover:bg-muted transition-colors disabled:opacity-60"
+        disabled={signingOut}
+      >
         <Avatar className="h-7 w-7">
-          {!!avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
-          <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+          {avatarUrl ? (
+            <AvatarImage src={avatarUrl} alt={name || "User avatar"} />
+          ) : (
+            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+          )}
         </Avatar>
         <span className="hidden sm:inline-block max-w-[140px] truncate">{name}</span>
       </DropdownMenuTrigger>
@@ -66,9 +91,9 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onSignOut}>
+        <DropdownMenuItem onClick={onSignOut} disabled={signingOut}>
           <LogOut className="mr-2 h-4 w-4" />
-          Sign out
+          {signingOut ? "Signing out…" : "Sign out"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
