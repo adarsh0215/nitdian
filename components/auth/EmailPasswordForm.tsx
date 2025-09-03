@@ -201,7 +201,7 @@ export default function EmailPasswordForm({
       </div>
 
       <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground max-w-sm mx-auto">
-        By signing in, you agree to our{" "}
+        By signing in, you agree to our{" "} <br />
         <Link
           href="/policies/terms"
           className="font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[2px]"

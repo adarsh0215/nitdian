@@ -49,7 +49,7 @@ export default async function Page({
       </div>
 
       {/* Disclaimer */}
-      <p className="mt-6 text-center text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
+      <p className="mt-6 text-center  text-xs text-red-600 leading-relaxed max-w-sm mx-auto">
         Registration and login attempts on this portal are restricted to NIT Durgapur Alumni,
         Students and Authorized Representatives. Any unauthorized attempts to register, login, or
         access are prohibited.

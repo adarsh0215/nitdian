@@ -81,14 +81,20 @@ export default function DirectoryProfileCard({
           <h3 className="text-lg font-semibold leading-6">{name}</h3>
 
           {second ? (
-            <div className="mt-1 flex items-start gap-2 text-[15px] leading-6">
-              <p className="text-sm ">{second}</p>
+            <div className=" flex flex-col items-start text-[#818589] text-[15px] leading-6">
+              <div>
+                <p className="text-sm font-bold  ">{profile.branch}</p>
+              </div>
+              <div className="flex gap-4">
+                  <p className="text-sm font-bold ">{profile.graduation_year}</p>
+                  <p className="text-sm font-bold ">{ profile.degree}</p>
+              </div>
             </div>
             
           ) : null}
 
           {location ? (
-            <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <p className="mt-6 flex items-center gap-2  font-bold text-sm text-[#608286]">
               {location}
             </p>
           ) : null}
@@ -96,7 +102,7 @@ export default function DirectoryProfileCard({
           {headline ? (
             <div className="mt-1 flex items-start gap-2 text-[15px] leading-6">
               
-              <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{headline}</p>
+              <p className="text-sm text-[#608286] font-bold line-clamp-1">{headline}</p>
             </div>
           ) : null}
 
