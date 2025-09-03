@@ -1,3 +1,4 @@
+// app/(auth)/login/page.tsx
 import AuthCard from "@/components/auth/AuthCard";
 import EmailPasswordForm from "@/components/auth/EmailPasswordForm";
 import GoogleButton from "@/components/auth/GoogleButton";
@@ -5,15 +6,17 @@ import Link from "next/link";
 
 export const metadata = { title: "Sign in" };
 
-export default function Page({
+type SP = Record<string, string | string[] | undefined>;
+const first = (v: string | string[] | undefined) =>
+  typeof v === "string" ? v : Array.isArray(v) ? v[0] : undefined;
+
+export default async function Page({
   searchParams,
 }: {
-  searchParams?: Record<string, string | string[]>;
+  searchParams?: Promise<SP>;
 }) {
-  const next =
-    typeof searchParams?.next === "string" && searchParams.next.length > 0
-      ? searchParams.next
-      : "/dashboard";
+  const sp = (await searchParams) ?? {};
+  const next = first(sp.next) || "/dashboard";
 
   return (
     <AuthCard title="Welcome back" subtitle="Log in to your alumni account">
@@ -49,8 +52,8 @@ export default function Page({
       {/* Disclaimer */}
       <p className="mt-6 text-center text-xs text-muted-foreground leading-relaxed max-w-sm mx-auto">
         Registration and login attempts on this portal are restricted to NIT Durgapur Alumni,
-        Students and Authorized Representatives. Any unauthorized attempts to register, login,
-        or access are prohibited.
+        Students and Authorized Representatives. Any unauthorized attempts to register, login, or
+        access are prohibited.
       </p>
     </AuthCard>
   );

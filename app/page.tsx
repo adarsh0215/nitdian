@@ -1,13 +1,14 @@
-import AnnouncementBar from "@/components/home/AnnouncementBar";
 import Hero from "@/components/home/Hero";
 import BrandStrip from "@/components/home/BrandStrip";
 import ValueGrid from "@/components/home/ValueGrid";
-import QuickActions from "@/components/home/QuickActions";
-import Spotlight from "@/components/home/Spotlight";
+// import QuickActions from "@/components/home/QuickActions"; // ← keep commented if not used
+// import Spotlight from "@/components/home/Spotlight";       // ← remove import while section is commented
 import Testimonials from "@/components/home/Testimonials";
 import HowItWorks from "@/components/home/HowItWorks";
 import JoinCta from "@/components/home/JoinCta";
 import SiteFooter from "@/components/home/SiteFooter";
+// import Highlight from "@/components/home/Highlight";
+import Featured from "@/components/home/Featured";
 import { HOMEPAGE_DATA } from "@/components/home/data";
 
 export const metadata = {
@@ -17,16 +18,15 @@ export const metadata = {
 
 export default function Page() {
   const d = HOMEPAGE_DATA;
+
   return (
     <main className="min-h-[100dvh] bg-background text-foreground">
-      {/* Announcement */}
-      {/* {d.announcement?.enabled && (
-        <AnnouncementBar
-          text={d.announcement.text}
-          ctaLabel={d.announcement.cta.label}
-          ctaHref={d.announcement.cta.href}
-        />
-      )} */}
+      {/* Announcement (uncomment if you want to show it) */}
+      {/* <AnnouncementBar
+        text={d.announcement.text}
+        ctaLabel={d.announcement.cta.label}
+        ctaHref={d.announcement.cta.href}
+      /> */}
 
       {/* Hero */}
       <Hero
@@ -39,7 +39,7 @@ export default function Page() {
       {/* Brand strip */}
       <BrandStrip caption={d.brands.caption} brands={d.brands.items} />
 
-      {/* Value grid */}
+      {/* Why join */}
       <section className="py-10 sm:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ValueGrid
@@ -50,8 +50,19 @@ export default function Page() {
         </div>
       </section>
 
-      {/* Quick actions */}
-      {/* <section className="py-8 sm:py-12  min-w-dvh">
+      {/* Highlight (carousel) */}
+      {/* <section className="py-10 sm:py-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Highlight
+            heading={d.highlightData.heading}
+            subheading={d.highlightData.subheading ?? ""}  // ← safe fallback
+            items={d.highlightData.items}
+          />
+        </div>
+      </section> */}
+
+      {/* Quick actions (uncomment to use) */}
+      {/* <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <QuickActions
             heading={d.quickActionsSection.heading}
@@ -60,8 +71,9 @@ export default function Page() {
           />
         </div>
       </section> */}
-      {/* Spotlight */}
-      <section className="py-8 sm:py-12">
+
+      {/* Spotlight (commented out for now) */}
+      {/* <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Spotlight
             heading={d.spotlightSection.heading}
@@ -69,7 +81,7 @@ export default function Page() {
             event={d.spotlightSection.event}
           />
         </div>
-      </section>
+      </section> */}
 
       {/* Testimonials */}
       <section className="py-10 sm:py-14">
@@ -78,6 +90,17 @@ export default function Page() {
             heading={d.testimonialsSection.heading}
             subheading={d.testimonialsSection.subheading}
             items={d.testimonialsSection.items}
+          />
+        </div>
+      </section>
+
+      {/* Featured */}
+      <section className="py-10 sm:py-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <Featured
+            heading={d.featuredData.heading}
+            subheading={d.featuredData.subheading}
+            items={d.featuredData.items}
           />
         </div>
       </section>
@@ -95,15 +118,14 @@ export default function Page() {
 
       {/* Join CTA */}
       <section className="py-10 sm:py-14">
-  <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-    <JoinCta
-      headline={d.joinSection.headline}
-      subheading={d.joinSection.subheading}
-      cta={d.joinSection.cta}
-    />
-  </div>
-</section>
-
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+          <JoinCta
+            headline={d.joinSection.headline}
+            subheading={d.joinSection.subheading}
+            cta={d.joinSection.cta}
+          />
+        </div>
+      </section>
 
       {/* Footer */}
       <SiteFooter {...d.footer} />

@@ -7,9 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useFormStatus } from "react-dom";
+import Link from "next/link";
 
-// The server actions redirect on success; on failure they return { ok:false, error }.
-// That's the only state we render in the form.
 type ActionState = { ok: false; error: string } | null;
 
 function SubmitButton({ mode }: { mode: "login" | "signup" }) {
@@ -28,6 +27,21 @@ function SubmitButton({ mode }: { mode: "login" | "signup" }) {
   );
 }
 
+/** Robustly detect Next.js redirect errors thrown by `redirect()` */
+function isNextRedirect(err: unknown): boolean {
+  if (!err) return false;
+
+  // string case
+  if (typeof err === "string") return err.includes("NEXT_REDIRECT");
+
+  // object-ish cases
+  const anyErr = err as Record<string, unknown>;
+  const digest = typeof anyErr?.digest === "string" ? (anyErr.digest as string) : "";
+  const message = typeof anyErr?.message === "string" ? (anyErr.message as string) : "";
+
+  return digest.includes("NEXT_REDIRECT") || message.includes("NEXT_REDIRECT");
+}
+
 export default function EmailPasswordForm({
   mode,
   next,
@@ -35,33 +49,29 @@ export default function EmailPasswordForm({
   mode: "login" | "signup";
   next?: string;
 }) {
-  const serverAction =
-    mode === "login" ? signInWithPassword : signUpWithPassword;
+  const serverAction = mode === "login" ? signInWithPassword : signUpWithPassword;
 
-  // Type guard for server action failure shape (no `any` used)
   function isErrorResult(val: unknown): val is { ok: false; error: string } {
     if (typeof val !== "object" || val === null) return false;
     const v = val as Record<string, unknown>;
     return v.ok === false && typeof v.error === "string";
   }
 
-  // Adapter to normalize server action output -> ActionState
   const action = React.useCallback(
     async (_state: ActionState, formData: FormData): Promise<ActionState> => {
       try {
-        // ensure `next` is always sent; server decides where to send user
         if (!formData.get("next")) formData.set("next", next ?? "");
-
-        // The server action either redirects (never returns) or returns { ok:false, error }
         const res = await serverAction(null as unknown as never, formData);
 
-        if (isErrorResult(res)) {
-          return res; // show the error inline
-        }
+        // If the action returned an error payload, show it.
+        if (isErrorResult(res)) return res;
 
-        // success -> redirect already happened; keep local state empty
+        // Success paths usually never return because `redirect()` is thrown.
         return null;
-      } catch (err: unknown) {
+      } catch (err) {
+        // 🔑 Let Next.js complete its redirect instead of rendering the message.
+        if (isNextRedirect(err)) throw err;
+
         const message = err instanceof Error ? err.message : "Unexpected error";
         return { ok: false, error: message };
       }
@@ -69,10 +79,7 @@ export default function EmailPasswordForm({
     [serverAction, next]
   );
 
-  const [state, formAction] = React.useActionState<ActionState, FormData>(
-    action,
-    null
-  );
+  const [state, formAction] = React.useActionState<ActionState, FormData>(action, null);
 
   const [revealed, setRevealed] = React.useState(false);
   const emailId = React.useId();
@@ -124,6 +131,24 @@ export default function EmailPasswordForm({
           </button>
         </div>
       </div>
+
+      <p className="mt-6 text-center text-xs leading-relaxed text-muted-foreground max-w-sm mx-auto">
+        By signing in, you agree to our{" "}
+        <Link
+          href="/policies/terms"
+          className="font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[2px]"
+        >
+          Terms &amp; Conditions
+        </Link>{" "}
+        and{" "}
+        <Link
+          href="/policies/privacy"
+          className="font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[2px]"
+        >
+          Privacy Policy
+        </Link>
+        .
+      </p>
 
       {state?.error ? (
         <p id={errId} className="text-sm text-destructive" role="alert" aria-live="polite">

@@ -23,69 +23,93 @@ export type UserPillData = {
 export default function UserPill({ name, email, avatarUrl }: UserPillData) {
   const router = useRouter();
   const [signingOut, setSigningOut] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
 
   const initials = React.useMemo(() => {
-    const parts = (name || "").trim().split(/\s+/);
+    const n = (name || "").trim();
+    if (!n && email) return email.charAt(0).toUpperCase();
+    const parts = n.split(/\s+/);
     const a = parts[0]?.[0] ?? "";
     const b = parts[1]?.[0] ?? "";
-    return (a + b).toUpperCase() || (email?.[0]?.toUpperCase() ?? "U");
+    const two = (a + b).toUpperCase();
+    return two || "U";
   }, [name, email]);
+
+  const go = (href: string) => {
+    setOpen(false);
+    router.push(href);
+  };
 
   const onSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
+    setOpen(false);
     try {
       const supabase = supabaseBrowser();
 
-      // 1) Clear client auth (and broadcast to other tabs)
-      await supabase.auth.signOut({ scope: "global" });
+      // Run both in parallel to cut perceived delay
+      await Promise.allSettled([
+        supabase.auth.signOut({ scope: "global" }),
+        fetch("/auth/callback/signout", {
+          method: "POST",
+          credentials: "include",
+        }),
+      ]);
 
-      // 2) Clear server HttpOnly cookies (your route handler does the clearing)
-      await fetch("/auth/callback/signout", {
-        method: "POST",
-        credentials: "include",
-      });
-
-      // 3) Refresh UI and go to login
+      // Refresh any server-rendered bits and send to login
       router.refresh();
-      router.push("/login");
+      router.replace("/login");
     } catch {
+      // Even on error, try to refresh to reflect best-known state
       router.refresh();
+      router.replace("/login");
     } finally {
       setSigningOut(false);
     }
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
         className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1.5 text-sm hover:bg-muted transition-colors disabled:opacity-60"
         disabled={signingOut}
+        aria-busy={signingOut || undefined}
+        aria-label={signingOut ? "Signing out" : `User menu for ${name || email}`}
       >
         <Avatar className="h-7 w-7">
           {avatarUrl ? (
-            <AvatarImage src={avatarUrl} alt={name || "User avatar"} />
+            <AvatarImage
+              src={avatarUrl}
+              alt={name || "User avatar"}
+              referrerPolicy="no-referrer"
+            />
           ) : (
             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
           )}
         </Avatar>
-        <span className="hidden sm:inline-block max-w-[140px] truncate">{name}</span>
+        <span className="hidden sm:inline-block max-w-[140px] truncate" title={name}>
+          {name}
+        </span>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="truncate">{name}</DropdownMenuLabel>
-        <div className="px-2 pb-2 text-xs text-muted-foreground truncate">{email}</div>
+        <DropdownMenuLabel className="truncate" title={name}>
+          {name}
+        </DropdownMenuLabel>
+        <div className="px-2 pb-2 text-xs text-muted-foreground truncate" title={email}>
+          {email}
+        </div>
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem onClick={() => router.push("/dashboard")}>
+        <DropdownMenuItem onClick={() => go("/dashboard")}>
           <LayoutDashboard className="mr-2 h-4 w-4" />
           Dashboard
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/profile")}>
+        <DropdownMenuItem onClick={() => go("/profile")}>
           <UserIcon className="mr-2 h-4 w-4" />
           Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push("/settings")}>
+        <DropdownMenuItem onClick={() => go("/settings")}>
           <Settings className="mr-2 h-4 w-4" />
           Settings
         </DropdownMenuItem>

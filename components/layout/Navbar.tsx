@@ -1,3 +1,4 @@
+// components/layout/Navbar.tsx
 "use client";
 
 import * as React from "react";
@@ -9,77 +10,142 @@ import { Button } from "@/components/ui/button";
 import ThemeSwitcher from "@/components/ui/theme-switcher";
 import UserPill, { type UserPillData } from "@/components/layout/UserPill";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 
 const NAV_LINKS = [
   { label: "Home", href: "/" },
   { label: "Directory", href: "/directory" },
   { label: "Dashboard", href: "/dashboard" },
-  { label: "About", href: "/about" },
 ];
+
+type ProfileMeta = {
+  full_name?: string;
+  avatar_url?: string;
+};
+
+function getProfileMeta(meta: unknown): ProfileMeta {
+  if (meta && typeof meta === "object") {
+    const m = meta as Record<string, unknown>;
+    return {
+      full_name: typeof m.full_name === "string" ? m.full_name : undefined,
+      avatar_url: typeof m.avatar_url === "string" ? m.avatar_url : undefined,
+    };
+  }
+  return {};
+}
 
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
+
+  const supabase = React.useMemo(() => supabaseBrowser(), []);
   const [open, setOpen] = React.useState(false);
+
+  // Important: start "loading" and don't show logged-out UI until we know for sure
   const [loadingUser, setLoadingUser] = React.useState(true);
   const [pill, setPill] = React.useState<UserPillData | null>(null);
 
-  const fetchUser = React.useCallback(async () => {
-    try {
-      const supabase = supabaseBrowser();
-      const { data: userRes } = await supabase.auth.getUser();
-      const user = userRes?.user ?? null;
+  const pillFromUser = React.useCallback((user: User): UserPillData => {
+    const { full_name, avatar_url } = getProfileMeta(user.user_metadata);
+    const name = full_name ?? user.email?.split("@")[0] ?? "Member";
+    const email = user.email ?? "";
+    const avatarUrl = avatar_url ?? null;
+    return { name, email, avatarUrl };
+  }, []);
 
-      if (!user) {
-        setPill(null);
-        setLoadingUser(false);
-        return;
-      }
-
+  const hydrateFromProfile = React.useCallback(
+    async (userId: string | null) => {
+      if (!userId) return;
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name, avatar_url, email")
-        .eq("id", user.id)
-        .single();
+        .eq("id", userId)
+        .maybeSingle();
 
-      const name =
-        profile?.full_name ||
-        user.user_metadata?.full_name ||
-        user.email?.split("@")[0] ||
-        "Member";
-      const email = profile?.email || user.email || "";
-      const avatarUrl =
-        profile?.avatar_url || user.user_metadata?.avatar_url || null;
-
-      setPill({ name, email, avatarUrl });
-      setLoadingUser(false);
-    } catch {
-      setPill(null);
-      setLoadingUser(false);
-    }
-  }, []);
+      if (profile) {
+        setPill((prev) => ({
+          name: profile.full_name || prev?.name || "Member",
+          email: profile.email || prev?.email || "",
+          avatarUrl: profile.avatar_url || prev?.avatarUrl || null,
+        }));
+      }
+    },
+    [supabase]
+  );
 
   React.useEffect(() => {
-    const supabase = supabaseBrowser();
+    let cancelled = false;
+    let gotInitialEvent = false;
 
-    fetchUser();
+    // 1) Subscribe to auth changes (fires very early with INITIAL_SESSION)
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      async (event: AuthChangeEvent, session: Session | null) => {
+        if (cancelled) return;
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      fetchUser();
-      router.refresh();
-    });
+        if (event === "INITIAL_SESSION") gotInitialEvent = true;
+
+        const user = session?.user ?? null;
+        if (user) {
+          setPill(pillFromUser(user));
+          setLoadingUser(false);
+          // hydrate friendly name/avatar from profiles (async)
+          hydrateFromProfile(user.id);
+        } else {
+          // Only mark logged out after we KNOW initial session is resolved
+          if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+            setPill(null);
+            setLoadingUser(false);
+          }
+        }
+
+        // Refresh server components if they depend on auth cookies
+        router.refresh();
+      }
+    );
+
+    // 2) Seed quickly from local (no network)
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const user = data.session?.user ?? null;
+      if (user) {
+        setPill(pillFromUser(user));
+        setLoadingUser(false);
+        hydrateFromProfile(user.id);
+      }
+    })();
+
+    // 3) Fallback if INITIAL_SESSION never arrives
+    const fallback = setTimeout(() => {
+      if (!gotInitialEvent && !cancelled) {
+        setLoadingUser(false);
+      }
+    }, 1200);
+
+    // 4) Instant profile updates right after onboarding save
+    type ProfileUpdatedDetail = Partial<UserPillData>;
+    const onProfileUpdated = (e: Event) => {
+      const ce = e as CustomEvent<ProfileUpdatedDetail>;
+      const detail = ce.detail ?? {};
+      setPill((prev) => ({
+        name: detail.name ?? prev?.name ?? "Member",
+        email: detail.email ?? prev?.email ?? "",
+        avatarUrl: detail.avatarUrl ?? prev?.avatarUrl ?? null,
+      }));
+    };
+    window.addEventListener("profile:updated", onProfileUpdated);
 
     return () => {
-      subscription.unsubscribe();
+      cancelled = true;
+      clearTimeout(fallback);
+      window.removeEventListener("profile:updated", onProfileUpdated);
+      sub.subscription.unsubscribe();
     };
-  }, [fetchUser, router]);
+  }, [supabase, pillFromUser, hydrateFromProfile, router]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Left: Logo */}
+        {/* Logo */}
         <Link
           href="/"
           aria-label="NIT Durgapur"
@@ -130,7 +196,6 @@ export default function Navbar() {
           ) : pill ? (
             <UserPill {...pill} />
           ) : (
-            // Show both auth buttons on desktop; hide on mobile (they appear in the sheet)
             <div className="hidden md:flex items-center gap-2">
               <Button size="sm" variant="outline" asChild>
                 <Link href="/signup">Sign up</Link>

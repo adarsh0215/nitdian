@@ -1,14 +1,19 @@
+export type IconKey = "user" | "briefcase" | "graduation" | "users" | "handshake";
 export type Cta = { label: string; href: string };
-export type Brand = { 
-  name: string; 
+
+export type Brand = {
+  name: string;
   logoText?: string;
   logoUrl?: string;
-  href?: string  };
+  href?: string;
+};
+
 export type ValueItem = {
   title: string;
   description: string;
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
+
 export type QuickActionItem = {
   title: string;
   description: string;
@@ -17,13 +22,36 @@ export type QuickActionItem = {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
 
+export type HighlightItem = {
+  quote: string;
+  author: string;
+  role?: string;
+  icon?: string; // icon-based avatar
+  avatar?: string | null;                                     // optional legacy support
+};
+
+export type HighlightData = {
+  heading: string;
+  subheading?: string;
+  items: HighlightItem[];
+};
+
 export type TestimonialItem = {
   quote: string;
-  author: string;      // e.g., "Ritwik ’16"
-  role?: string;       // e.g., "SDE @ Microsoft"
-  avatar?: string | null; 
-  href: string;// /public/avatars/ritwik.jpg (optional)
+  author: string;
+  role?: string;
+  avatar?: string | null;
+  href: string;
 };
+
+export type FeaturedItem = HighlightItem;
+
+export type FeaturedData = {
+  heading: string;
+  subheading: string;
+  items: FeaturedItem[];
+};
+
 export type SpotlightEvent = {
   title: string;
   blurb: string;
@@ -32,6 +60,7 @@ export type SpotlightEvent = {
   image?: string | null;
   cta: Cta;
 };
+
 export type HowStepItem = {
   title: string;
   description: string;

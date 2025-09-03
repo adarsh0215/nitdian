@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RequiredAsterisk } from "./Field";
 import type { OnboardingValues } from "@/lib/validation/onboarding";
+import Link from "next/link";
 
 export default function TermsCheckbox({
   control,
@@ -30,14 +31,21 @@ export default function TermsCheckbox({
               htmlFor="consent_terms_privacy"
               className="text-sm leading-5 cursor-pointer"
             >
+              
               I agree to the{" "}
-              <a href="/terms" className="underline underline-offset-4">
-                Terms &amp; Conditions
-              </a>{" "}
-              and{" "}
-              <a href="/privacy" className="underline underline-offset-4">
-                Privacy Policy
-              </a>
+              <Link
+          href="/terms" // ← make sure this route exists
+          className="font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[2px]"
+        >
+          Terms &amp; Conditions
+        </Link>{" "}
+        and{" "}
+        <Link
+          href="/privacy" // ← and this one
+          className="font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-[2px]"
+        >
+          Privacy Policy
+        </Link>
               . <RequiredAsterisk />
             </Label>
           </div>

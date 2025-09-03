@@ -1,73 +1,53 @@
+// components/home/Testimonials.tsx
 "use client";
 
 import * as React from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import type { TestimonialItem } from "./types";
+
+/* ---------- Types ---------- */
+export type TestimonialItem = {
+  quote: string;
+  author: string;
+  role?: string;
+  avatar?: string | null;
+};
 
 export default function Testimonials({
   heading,
   subheading,
   items,
+  count = 3, // show up to 3 stacked cards
 }: {
   heading: string;
-  subheading: string;
+  subheading?: string;
   items: TestimonialItem[];
+  count?: number;
 }) {
   if (!items?.length) return null;
-  const [featured, ...rest] = items;
+  const featured = items.slice(0, Math.max(1, Math.min(count, 3)));
 
   return (
-    <section className="space-y-10">
+    <section className="space-y-8">
       {/* Section header */}
       <div className="text-center mx-auto max-w-2xl">
         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">{heading}</h2>
-        <p className="mt-2 text-muted-foreground">{subheading}</p>
+        {subheading ? <p className="mt-2 text-muted-foreground">{subheading}</p> : null}
       </div>
 
-      {/* Featured */}
-      <Featured item={featured} />
-
-      {/* Mobile carousel (one full card visible + next peeking) */}
-      <div className="sm:hidden -mx-4 px-4">
-        <div className="relative">
-          <div
-            className="
-              flex gap-4 overflow-x-auto scroll-smooth no-scrollbar py-1
-              snap-x snap-mandatory [scroll-padding-inline:1rem]
-            "
-          >
-            {rest.map((t, i) => (
-              <Small
-                key={i}
-                item={t}
-                className="
-                  snap-start
-                  min-w-[calc(100%_-_3.5rem)]  /* one full card + peek of next */
-                "
-              />
-            ))}
-          </div>
-
-          {/* soft edge fades */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-background to-transparent" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent" />
-        </div>
-      </div>
-
-      {/* Desktop: equal-height grid */}
-      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-4 [grid-auto-rows:1fr] items-stretch">
-        {rest.map((t, i) => (
-          <Small key={i} item={t} />
+      {/* Three stacked featured cards */}
+      <div className="space-y-6">
+        {featured.map((item, i) => (
+          <FeaturedCard key={`${item.author}-${i}`} item={item} />
         ))}
       </div>
     </section>
   );
 }
 
-/* ---------------- Featured (expand/collapse) ---------------- */
-function Featured({ item }: { item: TestimonialItem }) {
+/* ---------- Featured full-width card ---------- */
+function FeaturedCard({ item }: { item: TestimonialItem }) {
   const [expanded, setExpanded] = React.useState(false);
-  const [collapsedMax, setCollapsedMax] = React.useState(0);   // 4 lines
+  const [collapsedMax, setCollapsedMax] = React.useState(0);   // px for 4 lines
   const [contentHeight, setContentHeight] = React.useState(0);
   const [canExpand, setCanExpand] = React.useState(false);
   const contentRef = React.useRef<HTMLDivElement>(null);
@@ -81,7 +61,7 @@ function Featured({ item }: { item: TestimonialItem }) {
       const fs = parseFloat(cs.fontSize || "16");
       const lhRaw = cs.lineHeight;
       const lh = lhRaw === "normal" || !lhRaw ? 1.5 * fs : parseFloat(lhRaw);
-      const max = Math.round(lh * 4 + 2); // 4 lines
+      const max = Math.round(lh * 4 + 2); // 4 lines (tiny buffer)
       setCollapsedMax(max);
       setContentHeight(el.scrollHeight);
       setCanExpand(el.scrollHeight > max + 1);
@@ -103,10 +83,10 @@ function Featured({ item }: { item: TestimonialItem }) {
         className="
           grid gap-5 md:gap-8 items-start
           md:[grid-template-columns:minmax(220px,_280px)_1fr]
-          lg:[grid-template-columns:280px_1fr]
+          lg:[grid-template-columns:300px_1fr]
         "
       >
-        {/* Left: avatar + identity (centered on md+) */}
+        {/* Left rail: avatar + identity (centered on md+) */}
         <div className="flex gap-4 md:flex-col md:items-center md:text-center">
           <Avatar className="h-20 w-20 sm:h-24 sm:w-24 bg-card ring-4 ring-background shadow-sm">
             {item.avatar ? <AvatarImage src={item.avatar} alt={item.author} /> : null}
@@ -127,7 +107,7 @@ function Featured({ item }: { item: TestimonialItem }) {
           </div>
         </div>
 
-        {/* Right: message (smooth expand/collapse) */}
+        {/* Right: message (smooth expand/collapse + FADE when collapsed) */}
         <blockquote className="rounded-2xl border border-border bg-card shadow-sm p-4 sm:p-6 md:p-7 min-w-0 transition-shadow duration-300 hover:shadow-md">
           <div className="relative">
             <div
@@ -145,15 +125,23 @@ function Featured({ item }: { item: TestimonialItem }) {
               <span aria-hidden className="ml-1 text-2xl align-bottom select-none text-primary">”</span>
             </div>
 
+            {/* Fade overlay only when collapsed */}
             {!expanded && canExpand && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-b from-transparent to-card" />
+              <div
+                className="
+                  pointer-events-none absolute inset-x-0 bottom-0 h-10
+                  bg-gradient-to-b from-transparent to-card
+                "
+                aria-hidden
+              />
             )}
           </div>
 
+          {/* Toggle aligned right */}
           {canExpand && (
             <button
               type="button"
-              onClick={() => setExpanded((v) => !v)}
+              onClick={() => setExpanded(v => !v)}
               aria-expanded={expanded}
               className="mt-3 ml-auto block text-sm font-medium underline underline-offset-4"
             >
@@ -166,113 +154,11 @@ function Featured({ item }: { item: TestimonialItem }) {
   );
 }
 
-/* ---------------- Small cards ---------------- */
-function Small({
-  item,
-  className = "",
-}: {
-  item: TestimonialItem;
-  className?: string;
-}) {
-  const [expanded, setExpanded] = React.useState(false);
-  const [collapsedMax, setCollapsedMax] = React.useState(0);   // 4 lines
-  const [contentHeight, setContentHeight] = React.useState(0);
-  const [canExpand, setCanExpand] = React.useState(false);
-  const contentRef = React.useRef<HTMLDivElement>(null);
 
-  React.useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-
-    const compute = () => {
-      const lh = parseFloat(getComputedStyle(el).lineHeight || "20");
-      const max = Math.round(lh * 4 + 2); // 4 lines
-      setCollapsedMax(max);
-      setContentHeight(el.scrollHeight);
-      setCanExpand(el.scrollHeight > max + 1);
-    };
-
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(el);
-    window.addEventListener("resize", compute);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", compute);
-    };
-  }, [item.quote]);
-
-  return (
-    <article
-      className={[
-        "rounded-2xl border border-border bg-card p-4 sm:p-5 w-full h-full",
-        "transition-all duration-300 hover:shadow-md hover:-translate-y-0.5",
-        "flex flex-col",
-        "min-h-[16rem] sm:min-h-[15rem]", // consistent baseline height
-        className,
-      ].join(" ")}
-    >
-      {/* Quote (animated height) */}
-      <div className="relative min-w-0">
-        <div
-          ref={contentRef}
-          style={{
-            maxHeight: expanded ? contentHeight : collapsedMax,
-            transition: "max-height 300ms ease",
-            overflow: "hidden",
-            willChange: "max-height",
-          }}
-          className="text-sm sm:text-base leading-relaxed break-words"
-        >
-          <span aria-hidden className="mr-1 text-xl align-top select-none text-primary">“</span>
-          {item.quote}
-          <span aria-hidden className="ml-1 text-xl align-bottom select-none text-primary">”</span>
-        </div>
-
-        {!expanded && canExpand && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-card" />
-        )}
-      </div>
-
-      {/* Toggle — right aligned */}
-      {canExpand && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded}
-          className="mt-3 ml-auto text-xs sm:text-sm font-medium underline underline-offset-4"
-        >
-          {expanded ? "Read less" : "Read more"}
-        </button>
-      )}
-
-      {/* Footer pinned to bottom */}
-      <div className="mt-auto pt-4 border-t border-border/70">
-        <div className="flex items-center gap-3 min-w-0">
-          <Avatar className="h-8 w-8 sm:h-9 sm:w-9 bg-muted ring-2 ring-background">
-            {item.avatar ? <AvatarImage src={item.avatar} alt={item.author} /> : null}
-            <AvatarFallback className="text-[10px] sm:text-xs font-medium">
-              {initials(item.author)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <div className="text-sm sm:text-base font-medium leading-tight truncate">
-              {item.author}
-            </div>
-            {item.role ? (
-              <div className="text-xs sm:text-sm text-muted-foreground leading-tight truncate">
-                {item.role}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-/* Helpers */
+/* ---------- Helpers ---------- */
 function initials(name: string) {
-  const first = (name || "").trim().charAt(0).toUpperCase();
-  return first || "A";
+  const n = (name || "").trim();
+  if (!n) return "A";
+  const [a, b] = n.split(/\s+/);
+  return ((a?.[0] || "") + (b?.[0] || "")).toUpperCase();
 }
