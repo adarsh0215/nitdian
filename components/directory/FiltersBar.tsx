@@ -48,7 +48,7 @@ export default function FiltersBar({
         <div className="sm:col-span-6 min-w-0">
           <Input
             className="w-full h-10"
-            placeholder="Search by name, company, city…"
+            placeholder="Search by name, company, city"
             value={local.q ?? ""}
             onChange={(e) => setLocal((s) => ({ ...s, q: e.target.value }))}
           />

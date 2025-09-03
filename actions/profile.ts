@@ -3,137 +3,198 @@
 
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { OnboardingSchema } from "@/lib/validation/onboarding";
+// ⬇️ import BOTH schemas
+import { OnboardingSchema, ProfileSchema } from "@/lib/validation/onboarding";
 
-type Result = { ok: false; error: string } | null;
+type Result = { ok: true } | { ok: false; error: string } | null;
 
-/* ------------------------- shared helpers ------------------------- */
-
-function parseFromForm(formData: FormData):
-  | { values: ReturnType<typeof OnboardingSchema.parse> }
-  | { error: string } {
-  const raw = Object.fromEntries(formData.entries());
-
-  const picks = {
-    full_name: String(raw.full_name || ""),
-    email: String(raw.email || ""),
-    // NEW 👇 gender (optional)
-    gender: raw.gender ? String(raw.gender) : undefined,
-
-    phone_e164: String(raw.phone_e164 || ""),
-    city: String(raw.city || ""),
-    country: String(raw.country || ""),
-    graduation_year: String(raw.graduation_year || ""),
-    degree: raw.degree ? String(raw.degree) : undefined,
-    branch: raw.branch ? String(raw.branch) : undefined,
-    roll_number: String(raw.roll_number || ""),
-    employment_type: raw.employment_type ? String(raw.employment_type) : undefined,
-    company: String(raw.company || ""),
-    designation: String(raw.designation || ""),
-    avatar_url: String(raw.avatar_url || ""),
-    interests:
-      formData.getAll("interests")?.map(String) ??
-      (raw.interests ? String(raw.interests).split(",").map((s) => s.trim()) : []),
-    consent_terms_privacy:
-      formData.get("consent_terms_privacy") === "on" ||
-      String(raw.consent_terms_privacy) === "true",
-    consent_directory_visible:
-      formData.get("consent_directory_visible") === "on" ||
-      String(raw.consent_directory_visible) === "true",
-    consent_directory_show_contacts:
-      formData.get("consent_directory_show_contacts") === "on" ||
-      String(raw.consent_directory_show_contacts) === "true",
-  };
-
-  const parsed = OnboardingSchema.safeParse(picks);
-  if (!parsed.success) {
-    const msg = parsed.error.issues[0]?.message ?? "Invalid input";
-    return { error: msg };
-  }
-  return { values: parsed.data };
+/* ---------- FormData helpers (null-safe) ---------- */
+function sReq(v: FormDataEntryValue | null): string {
+  return typeof v === "string" ? v : "";
+}
+function sOpt(v: FormDataEntryValue | null): string | undefined {
+  return typeof v === "string" ? v : undefined;
+}
+function bOpt(v: FormDataEntryValue | null): boolean | undefined {
+  const t = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return t === "true" ? true : t === "false" ? false : undefined;
+}
+function nOpt(v: FormDataEntryValue | null): number | undefined {
+  if (typeof v !== "string" || v.trim() === "") return undefined;
+  const num = Number(v);
+  return Number.isFinite(num) ? num : undefined;
 }
 
-async function upsertProfileBase(opts: {
-  values: ReturnType<typeof OnboardingSchema.parse>;
-  setOnboarded?: boolean;
-}): Promise<Result> {
-  const supabase = await supabaseServer();
+/* ---------- Shared parse from FormData ---------- */
+function parseRawFromFormData(fd: FormData) {
+  return {
+    // identity
+    full_name: sReq(fd.get("full_name")),
+    email: sReq(fd.get("email")),
+    gender: sOpt(fd.get("gender")),
 
+    // contact
+    phone_e164: sReq(fd.get("phone_e164")),
+    city: sOpt(fd.get("city")),
+    country: sOpt(fd.get("country")),
+
+    // education
+    graduation_year: nOpt(fd.get("graduation_year")),
+    degree: sOpt(fd.get("degree")),
+    branch: sOpt(fd.get("branch")),
+    roll_number: sOpt(fd.get("roll_number")),
+
+    // work
+    employment_type: sOpt(fd.get("employment_type")),
+    company: sOpt(fd.get("company")),
+    designation: sOpt(fd.get("designation")),
+
+    // media
+    avatar_url: sOpt(fd.get("avatar_url")),
+
+    // interests (multi)
+    interests: fd.getAll("interests").map(String),
+
+    // consents
+    consent_terms_privacy: bOpt(fd.get("consent_terms_privacy")),
+    consent_directory_visible: bOpt(fd.get("consent_directory_visible")),
+    consent_directory_show_contacts: bOpt(fd.get("consent_directory_show_contacts")),
+  };
+}
+
+/* ---------- Onboarding (strict) ---------- */
+export async function saveOnboarding(
+  _prevState: Result,
+  fd: FormData
+): Promise<Result> {
+  const sb = await supabaseServer();
   const {
     data: { user },
     error: userErr,
-  } = await supabase.auth.getUser();
-  if (userErr || !user) return { ok: false, error: "Not authenticated." };
+  } = await sb.auth.getUser();
+  if (userErr || !user) return { ok: false, error: "Not authenticated" };
 
-  const v = opts.values;
+  const raw = parseRawFromFormData(fd);
+  const parsed = OnboardingSchema.safeParse(raw);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map((i) => i.message).join(", ");
+    return { ok: false, error: msg || "Invalid input" };
+  }
+  const v = parsed.data;
 
-  // Keep the payload shape simple & permissive for TS
-  const upsert: Record<string, any> = {
-    id: user.id,
-    email: v.email,
-    full_name: v.full_name,
-    // NEW 👇 persist gender
-    gender: v.gender ?? null,
+  const accepted_terms_at = v.consent_terms_privacy ? new Date().toISOString() : null;
+  const is_public = v.consent_directory_visible ?? undefined;
 
-    phone_e164: v.phone_e164 || null,
-    city: v.city || null,
-    country: v.country || null,
-    graduation_year: v.graduation_year ?? null,
-    degree: v.degree ?? null,
-    branch: v.branch ?? null,
-    roll_number: v.roll_number || null,
-    employment_type: v.employment_type ?? null,
-    company: v.company || null,
-    designation: v.designation || null,
-    avatar_url: v.avatar_url || null,
-    interests: v.interests && v.interests.length ? v.interests : [],
-    consent_terms_privacy: v.consent_terms_privacy,
-    consent_directory_visible: v.consent_directory_visible,
-    consent_directory_show_contacts: v.consent_directory_show_contacts,
-  };
-
-  if (opts.setOnboarded) upsert.onboarded = true;
-
-  const { error: upsertErr } = await supabase
+  const { error } = await sb
     .from("profiles")
-    .upsert(upsert, { onConflict: "id" });
+    .upsert(
+      {
+        id: user.id,
+        email: v.email!,
+        full_name: v.full_name!,
+        gender: v.gender ?? null,
 
-  if (upsertErr) return { ok: false, error: upsertErr.message };
+        phone_e164: v.phone_e164 ?? null,
+        city: v.city ?? null,
+        country: v.country ?? null,
 
-  // Simpler: just set the timestamp (avoid `.is(..., null)` typing hassles)
-  if (v.consent_terms_privacy) {
-    await supabase
-      .from("profiles")
-      .update({ accepted_terms_at: new Date().toISOString() })
-      .eq("id", user.id);
+        graduation_year: v.graduation_year ?? null,
+        degree: v.degree ?? null,
+        branch: v.branch ?? null,
+        roll_number: v.roll_number ?? null,
+
+        employment_type: v.employment_type ?? null,
+        company: v.company ?? null,
+        designation: v.designation ?? null,
+
+        avatar_url: v.avatar_url ?? null,
+
+        interests: v.interests ?? [],
+
+        onboarded: true,
+        consent_terms_privacy: v.consent_terms_privacy ?? false,
+        consent_directory_visible: v.consent_directory_visible ?? false,
+        consent_directory_show_contacts: v.consent_directory_show_contacts ?? false,
+        accepted_terms_at,
+
+        ...(is_public !== undefined ? { is_public } : {}),
+      },
+      { onConflict: "id" }
+    )
+    .eq("id", user.id);
+
+  if (error) {
+    return { ok: false, error: error.message || "Failed to save onboarding" };
   }
 
-  return null;
-}
-
-/* ------------------------- actions ------------------------- */
-
-// Keep your onboarding behavior (redirect after save)
-export async function saveOnboarding(_prev: Result, formData: FormData): Promise<Result> {
-  const parsed = parseFromForm(formData);
-  if ("error" in parsed) return { ok: false, error: parsed.error };
-
-  const result = await upsertProfileBase({ values: parsed.values, setOnboarded: true });
-  if (result) return result;
-
   redirect("/dashboard");
 }
 
-// New action for Profile page (no redirect)
-// actions/profile.ts (only the saveProfile export shown)
+/* ---------- Profile (no redirect) ---------- */
+export async function saveProfile(
+  _prevState: Result,
+  fd: FormData
+): Promise<Result> {
+  const sb = await supabaseServer();
+  const {
+    data: { user },
+    error: userErr,
+  } = await sb.auth.getUser();
+  if (userErr || !user) return { ok: false, error: "Not authenticated" };
 
-export async function saveProfile(_prev: Result, formData: FormData): Promise<Result> {
-  const parsed = parseFromForm(formData);
-  if ("error" in parsed) return { ok: false, error: parsed.error };
+  const raw = parseRawFromFormData(fd);
 
-  const result = await upsertProfileBase({ values: parsed.values, setOnboarded: false });
-  if (result) return result; // show validation/db error on the form
+  // Use the dedicated ProfileSchema (terms optional; same directory constraint)
+  const parsed = ProfileSchema.safeParse(raw);
+  if (!parsed.success) {
+    const msg = parsed.error.issues.map((i) => i.message).join(", ");
+    return { ok: false, error: msg || "Invalid input" };
+  }
+  const v = parsed.data;
 
-  // ✅ redirect after successful update
-  redirect("/dashboard");
+  const is_public = v.consent_directory_visible ?? undefined;
+
+  const { error } = await sb
+    .from("profiles")
+    .upsert(
+      {
+        id: user.id,
+        email: v.email!,
+        full_name: v.full_name!,
+        gender: v.gender ?? null,
+
+        phone_e164: v.phone_e164 ?? null,
+        city: v.city ?? null,
+        country: v.country ?? null,
+
+        graduation_year: v.graduation_year ?? null,
+        degree: v.degree ?? null,
+        branch: v.branch ?? null,
+        roll_number: v.roll_number ?? null,
+
+        employment_type: v.employment_type ?? null,
+        company: v.company ?? null,
+        designation: v.designation ?? null,
+
+        avatar_url: v.avatar_url ?? null,
+
+        interests: v.interests ?? [],
+
+        // keep consents editable
+        consent_terms_privacy: v.consent_terms_privacy ?? false,
+        consent_directory_visible: v.consent_directory_visible ?? false,
+        consent_directory_show_contacts: v.consent_directory_show_contacts ?? false,
+
+        // do NOT touch onboarded / accepted_terms_at on profile edits
+        ...(is_public !== undefined ? { is_public } : {}),
+      },
+      { onConflict: "id" }
+    )
+    .eq("id", user.id);
+
+  if (error) {
+    return { ok: false, error: error.message || "Failed to save profile" };
+  }
+
+  return { ok: true };
 }

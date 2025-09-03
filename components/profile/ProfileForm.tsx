@@ -1,16 +1,20 @@
-// components/profile/ProfileForm.tsx
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+
 import {
   OnboardingSchema,
   type OnboardingValues,
+  toFormDefaults,
   DEGREES,
   BRANCHES,
   EMPLOYMENT_TYPES,
   COUNTRIES,
+  GENDERS,
+  INTERESTS,
 } from "@/lib/validation/onboarding";
 import { saveProfile } from "@/actions/profile";
 
@@ -19,50 +23,98 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-/* Reuse your existing field components */
+/* Reused field components (from onboarding) */
 import Field from "@/components/onboarding/fields/Field";
 import AvatarField from "@/components/onboarding/fields/AvatarField";
 import PhoneE164Field from "@/components/onboarding/fields/PhoneE164Field";
 import SelectEnumField from "@/components/onboarding/fields/SelectEnumField";
 import InterestsGrid from "@/components/onboarding/fields/InterestsGrid";
 import DirectoryConsents from "@/components/onboarding/fields/DirectoryConsents";
+import SelectYearField from "@/components/onboarding/fields/SelectYearField";
 
-type Result = { ok: false; error: string } | null;
+type ActionResult = Awaited<ReturnType<typeof saveProfile>>;
 
 export default function ProfileForm({
+  userEmail,
   userId,
-  defaults,
+  initial,
 }: {
+  userEmail?: string;
   userId: string;
-  defaults: OnboardingValues;
+  initial?: Partial<OnboardingValues>;
 }) {
-  // Keep schema identical to onboarding so all shared fields accept this control.
+  const router = useRouter();
   const resolver = zodResolver(OnboardingSchema) as Resolver<OnboardingValues>;
+
+  // Type guard to narrow interests to the allowed literals
+  const isAllowedInterest = (
+    i: unknown
+  ): i is OnboardingValues["interests"][number] =>
+    (INTERESTS as readonly string[]).includes(String(i));
+
+  const defaultValues = React.useMemo<OnboardingValues>(() => {
+    const base = toFormDefaults(userEmail);
+
+    const clean = (val: Partial<OnboardingValues> | undefined): Partial<OnboardingValues> =>
+      !val
+        ? {}
+        : {
+            gender: (val.gender ?? undefined) as OnboardingValues["gender"],
+            phone_e164: val.phone_e164 ?? "",
+            city: val.city ?? "",
+            country: val.country ?? "",
+            graduation_year: val.graduation_year ?? undefined,
+            degree: (val.degree ?? undefined) as OnboardingValues["degree"],
+            branch: (val.branch ?? undefined) as OnboardingValues["branch"],
+            roll_number: val.roll_number ?? "",
+            employment_type: (val.employment_type ??
+              undefined) as OnboardingValues["employment_type"],
+            company: val.company ?? "",
+            designation: val.designation ?? "",
+            avatar_url: val.avatar_url ?? undefined,
+            // ✅ Narrow interests to the union type
+            interests: Array.isArray(val.interests)
+              ? (val.interests.filter(isAllowedInterest) as OnboardingValues["interests"])
+              : ([] as OnboardingValues["interests"]),
+            consent_directory_visible: val.consent_directory_visible ?? false,
+            consent_directory_show_contacts: val.consent_directory_show_contacts ?? false,
+          };
+
+    return {
+      ...base,
+      ...clean(initial),
+      email: initial?.email ?? base.email,
+      full_name: initial?.full_name ?? base.full_name,
+      consent_terms_privacy: true, // always true for profile edits
+    };
+  }, [userEmail, initial]);
 
   const form = useForm<OnboardingValues>({
     resolver,
-    defaultValues: defaults,
+    defaultValues,
     mode: "onBlur",
   });
 
-  const [state, formAction] = React.useActionState<Result, FormData>(
-    async (_prev, fd) => saveProfile(null, fd),
-    null
+  const [state, formAction] = React.useActionState<ActionResult, FormData>(
+    saveProfile,
+    null as ActionResult
   );
   const [isPending, startTransition] = React.useTransition();
 
-  // After a successful save (state === null), notify Navbar to refresh UserPill.
+  // ✅ Redirect to dashboard after successful save
   React.useEffect(() => {
-    if (state === null) {
-      const values = form.getValues();
-      const detail = {
-        name: values.full_name,
-        email: values.email,
-        avatarUrl: values.avatar_url ?? null,
-      };
-      window.dispatchEvent(new CustomEvent("profile:updated", { detail }));
+    if (state && typeof state === "object" && "ok" in state && state.ok) {
+      router.push("/dashboard");
     }
-  }, [state, form]);
+  }, [state, router]);
+
+  // Focus/scroll to first invalid control on validation error
+  React.useEffect(() => {
+    if (!form.formState.errors) return;
+    const firstInvalid = document.querySelector<HTMLElement>("[aria-invalid='true']");
+    firstInvalid?.focus();
+    firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [form.formState.errors]);
 
   const onSubmit = form.handleSubmit((values) => {
     const fd = new FormData();
@@ -75,17 +127,12 @@ export default function ProfileForm({
         fd.set(k, String(v));
       }
     });
+    fd.set("consent_terms_privacy", "true"); // required for schema
 
-    // Not shown on Profile page, but the schema includes it; keep it true.
-    if (!fd.has("consent_terms_privacy")) fd.set("consent_terms_privacy", "true");
-
-    // Dispatch the server action; do NOT check the (void) return of formAction.
     startTransition(() => formAction(fd));
   });
 
-  const errors = form.formState.errors;
-
-  // ids for simple text inputs
+  // ids for inputs
   const idFullName = React.useId();
   const idEmail = React.useId();
   const idCity = React.useId();
@@ -93,52 +140,74 @@ export default function ProfileForm({
   const idRoll = React.useId();
   const idCompany = React.useId();
   const idDesignation = React.useId();
+  const idGender = React.useId();
+
+  const errors = form.formState.errors;
+  const isSaving = isPending || form.formState.isSubmitting;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Edit profile</CardTitle>
+        <CardTitle>Update your profile</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Keep your information up to date so other alumni can connect with you.
+          Keep your details up to date to help alumni connect with you.
         </p>
       </CardHeader>
-
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-8" noValidate>
           <AvatarField control={form.control} userId={userId} />
 
           {/* Basic info */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field
-              label="Full name ( As it appears in college records )"
-              htmlFor={idFullName}
-              required
-              error={errors.full_name?.message}
-            >
-              <Input
-                id={idFullName}
-                {...form.register("full_name")}
-                placeholder="Your full name"
-                autoComplete="name"
-                aria-required="true"
-                aria-invalid={!!errors.full_name}
-              />
-            </Field>
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 min-w-0">
+            {/* Email */}
+            <div className="sm:col-span-2 min-w-0">
+              <Field label="Email" htmlFor={idEmail} required>
+                <Input
+                  id={idEmail}
+                  {...form.register("email")}
+                  type="email"
+                  readOnly
+                  disabled
+                  autoComplete="email"
+                  aria-required="true"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Email is tied to your account and can’t be changed here.
+                </p>
+              </Field>
+            </div>
 
-            <Field label="Email" htmlFor={idEmail} required>
-              <Input
-                id={idEmail}
-                {...form.register("email")}
-                type="email"
-                readOnly
-                disabled
-                autoComplete="email"
-                aria-required="true"
-              />
-              <p className="text-xs text-muted-foreground">
-                Email is tied to your account and can’t be changed here.
-              </p>
-            </Field>
+            {/* Gender + Full name */}
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 min-w-0">
+              <div className="min-w-0">
+                <SelectEnumField
+                  control={form.control}
+                  name="gender"
+                  label="Gender"
+                  options={GENDERS as unknown as string[]}
+                  placeholder="Select gender"
+                  id={idGender}
+                  error={undefined}
+                />
+              </div>
+              <div className="sm:col-span-2 min-w-0">
+                <Field
+                  label="Full name ( As it appears in college records )"
+                  htmlFor={idFullName}
+                  required
+                  error={errors.full_name?.message}
+                >
+                  <Input
+                    id={idFullName}
+                    {...form.register("full_name")}
+                    placeholder="Your full name"
+                    autoComplete="name"
+                    aria-required="true"
+                    aria-invalid={!!errors.full_name}
+                  />
+                </Field>
+              </div>
+            </div>
 
             {/* Phone */}
             <PhoneE164Field
@@ -148,112 +217,128 @@ export default function ProfileForm({
               idLocal={React.useId()}
             />
 
-            <Field label="City" htmlFor={idCity}>
-              <Input
-                id={idCity}
-                {...form.register("city")}
-                placeholder="City"
-                autoComplete="address-level2"
+            {/* City + Country */}
+            <div className="min-w-0">
+              <Field label="City" htmlFor={idCity}>
+                <Input
+                  id={idCity}
+                  {...form.register("city")}
+                  placeholder="City"
+                  autoComplete="address-level2"
+                />
+              </Field>
+            </div>
+            <div className="min-w-0">
+              <SelectEnumField
+                control={form.control}
+                name="country"
+                label="Country"
+                options={COUNTRIES as unknown as string[]}
+                placeholder="Select country"
+                id={React.useId()}
+                error={undefined}
               />
-            </Field>
+            </div>
 
-            {/* Country */}
-            <SelectEnumField
-              control={form.control}
-              name="country"
-              label="Country"
-              options={COUNTRIES as unknown as string[]}
-              placeholder="Select country"
-              id={React.useId()}
-              error={undefined}
-            />
-
-            <Field
-              label="Graduation year"
-              htmlFor={idGradYear}
-              required
-              error={errors.graduation_year?.message as string | undefined}
-            >
-              <Input
+            {/* Graduation year + Degree */}
+            <div className="min-w-0">
+              <SelectYearField
+                control={form.control}
                 id={idGradYear}
-                {...form.register("graduation_year", {
-                  setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)),
-                })}
-                inputMode="numeric"
-                placeholder="2016"
-                aria-required="true"
-                aria-invalid={!!errors.graduation_year}
+                required
+                error={errors.graduation_year?.message as string | undefined}
               />
-            </Field>
-
-            <SelectEnumField
-              control={form.control}
-              name="degree"
-              label="Degree"
-              options={DEGREES as unknown as string[]}
-              required
-              id={React.useId()}
-              error={errors.degree?.message as string | undefined}
-            />
-
-            <SelectEnumField
-              control={form.control}
-              name="branch"
-              label="Branch"
-              options={BRANCHES as unknown as string[]}
-              required
-              id={React.useId()}
-              error={errors.branch?.message as string | undefined}
-            />
-
-            <Field label="Roll number ( at REC/NIT Durgapur )" htmlFor={idRoll}>
-              <Input id={idRoll} {...form.register("roll_number")} placeholder="(optional)" />
-            </Field>
-
-            <SelectEnumField
-              control={form.control}
-              name="employment_type"
-              label="Employment type"
-              options={EMPLOYMENT_TYPES as unknown as string[]}
-              id={React.useId()}
-              error={undefined}
-            />
-
-            <Field label="Company" htmlFor={idCompany}>
-              <Input
-                id={idCompany}
-                {...form.register("company")}
-                placeholder="Company"
-                autoComplete="organization"
+            </div>
+            <div className="min-w-0">
+              <SelectEnumField
+                control={form.control}
+                name="degree"
+                label="Degree"
+                options={DEGREES as unknown as string[]}
+                required
+                id={React.useId()}
+                error={errors.degree?.message as string | undefined}
               />
-            </Field>
+            </div>
 
-            <Field label="Designation" htmlFor={idDesignation}>
-              <Input
-                id={idDesignation}
-                {...form.register("designation")}
-                placeholder="Role / Title"
-                autoComplete="organization-title"
+            {/* Branch + Roll */}
+            <div className="min-w-0">
+              <SelectEnumField
+                control={form.control}
+                name="branch"
+                label="Branch"
+                options={BRANCHES as unknown as string[]}
+                required
+                id={React.useId()}
+                error={errors.branch?.message as string | undefined}
               />
-            </Field>
+            </div>
+            <div className="min-w-0">
+              <Field label="Roll Number ( at REC/NIT Durgapur )" htmlFor={idRoll}>
+                <Input
+                  id={idRoll}
+                  {...form.register("roll_number")}
+                  placeholder="(Valid Roll Number)"
+                />
+              </Field>
+            </div>
+
+            {/* Employment type */}
+            <div className="sm:col-span-2 min-w-0">
+              <SelectEnumField
+                control={form.control}
+                name="employment_type"
+                label="Employment type"
+                options={EMPLOYMENT_TYPES as unknown as string[]}
+                id={React.useId()}
+                error={undefined}
+              />
+            </div>
+
+            {/* Company + Designation */}
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 min-w-0">
+              <div className="min-w-0">
+                <Field label="Company" htmlFor={idCompany}>
+                  <Input
+                    id={idCompany}
+                    {...form.register("company")}
+                    placeholder="Company"
+                    autoComplete="organization"
+                  />
+                </Field>
+              </div>
+              <div className="min-w-0">
+                <Field label="Designation" htmlFor={idDesignation}>
+                  <Input
+                    id={idDesignation}
+                    {...form.register("designation")}
+                    placeholder="Role / Title"
+                    autoComplete="organization-title"
+                  />
+                </Field>
+              </div>
+            </div>
           </section>
 
+          {/* Interests */}
           <InterestsGrid
             control={form.control}
             error={errors.interests?.message as string | undefined}
           />
 
+          {/* Directory consents */}
           <DirectoryConsents control={form.control} />
 
-          {/* Action */}
-          {state?.error && (
+          {/* Server action error */}
+          {state && typeof state === "object" && "ok" in state && !state.ok && (state as any).error && (
             <p className="text-sm text-red-600" role="alert">
-              {state.error}
+              {(state as any).error}
             </p>
           )}
+
           <div className="flex items-center justify-end gap-3">
-            <Button type="submit" disabled={isPending} aria-busy={isPending}>
-              {isPending ? "Saving..." : "Save changes"}
+            <Button type="submit" disabled={isSaving} aria-busy={isSaving}>
+              {isSaving ? "Saving..." : "Save changes"}
             </Button>
           </div>
         </form>

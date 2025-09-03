@@ -7,6 +7,7 @@ import Section from "@/components/dashboard/ui/Section";
 import SuggestionCard from "@/components/dashboard/SuggestionCard";
 import ProfileCard from "@/components/dashboard/ProfileCard";
 import ProfileCompletionCard from "@/components/dashboard/ProfileCompletionCard";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 export default async function DashboardPage() {
   const sb = await supabaseServer();
@@ -35,7 +36,10 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false })
     .limit(5);
 
-  const [{ data: profile }, { data: _jobs }] = await Promise.all([profilePromise, jobsPromise]);
+  const [{ data: profile }, { data: _jobs }] = await Promise.all([
+    profilePromise,
+    jobsPromise,
+  ]);
 
   if (!profile?.onboarded) redirect("/onboarding");
   const isApproved = !!profile?.is_approved;
@@ -48,7 +52,8 @@ export default async function DashboardPage() {
     .eq("is_approved", true)
     .neq("id", user.id); // 🚫 exclude my own profile
 
-  if (profile?.graduation_year != null) sQuery = sQuery.eq("graduation_year", profile.graduation_year);
+  if (profile?.graduation_year != null)
+    sQuery = sQuery.eq("graduation_year", profile.graduation_year);
   if (profile?.branch) sQuery = sQuery.eq("branch", profile.branch);
   if (profile?.degree) sQuery = sQuery.eq("degree", profile.degree);
 
@@ -70,7 +75,9 @@ export default async function DashboardPage() {
 
   // Final defensive cleanup: de-dupe and exclude me (just in case)
   const cleanSuggestions = Array.from(
-    new Map((suggestions ?? []).filter((p) => p?.id !== user.id).map((p) => [p.id, p])).values()
+    new Map(
+      (suggestions ?? []).filter((p) => p?.id !== user.id).map((p) => [p.id, p])
+    ).values()
   );
 
   const essentialsMissing =
@@ -83,8 +90,15 @@ export default async function DashboardPage() {
   return (
     <main className="mx-auto max-w-6xl p-6 space-y-6">
       {!isApproved ? (
-        <div className="">
-          Your profile is pending approval. You can still edit your profile and browse jobs.
+        <div className="rounded-xl border border-yellow-300/50 bg-yellow-50 text-yellow-900 p-3 text-sm flex items-center gap-2 dark:bg-yellow-950/30 dark:text-yellow-100">
+          <AlertCircle className="h-4 w-4" />
+          Your profile is pending approval. 
+          You can still edit your Profile.
+          {/* {isAdmin ? (
+            <span className="ml-auto text-xs opacity-80">
+              (You’re admin—use Admin → Approvals)
+            </span>
+          ) : null} */}
         </div>
       ) : null}
 
@@ -112,13 +126,17 @@ export default async function DashboardPage() {
                       <SuggestionCard
                         name={p.full_name ?? "Alumni"}
                         avatar={p.avatar_url}
-                        meta={[p.branch, p.graduation_year, p.company].filter(Boolean).join(" • ")}
+                        meta={[p.branch, p.graduation_year, p.company]
+                          .filter(Boolean)
+                          .join(" • ")}
                       />
                     </li>
                   ))}
                 </ul>
               ) : (
-                <div className="rounded-xl border p-4 text-sm text-muted-foreground">No other Alumni of your Batch has registered so far.</div>
+                <div className="rounded-xl border p-4 text-sm text-muted-foreground">
+                  No other Alumni of your Batch has registered so far.
+                </div>
               )}
             </Section>
 

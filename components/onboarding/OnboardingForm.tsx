@@ -21,7 +21,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-
 /* Local small components */
 import Field from "./fields/Field";
 import AvatarField from "./fields/AvatarField";
@@ -32,7 +31,8 @@ import DirectoryConsents from "./fields/DirectoryConsents";
 import TermsCheckbox from "./fields/TermsCheckbox";
 import SelectYearField from "./fields/SelectYearField";
 
-type Result = { ok: false; error: string } | null;
+// >>> derive the action's result type from the server action itself
+type ActionResult = Awaited<ReturnType<typeof saveOnboarding>>;
 
 export default function OnboardingForm({
   userEmail,
@@ -49,19 +49,31 @@ export default function OnboardingForm({
     mode: "onBlur",
   });
 
-  const [state, formAction] = React.useActionState<Result, FormData>(
-    async (_prev, formData) => saveOnboarding(null, formData),
-    null
+  // useActionState types now match the actual action signature
+  const [state, formAction] = React.useActionState<ActionResult, FormData>(
+    saveOnboarding,
+    null as ActionResult
   );
   const [isPending, startTransition] = React.useTransition();
+
+  // Focus/scroll to first invalid control on validation error
+  React.useEffect(() => {
+    const firstInvalid = document.querySelector<HTMLElement>("[aria-invalid='true']");
+    // Some TS DOM libs type focus() without options; call without args
+    firstInvalid?.focus();
+    firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [form.formState.errors]);
 
   const onSubmit = form.handleSubmit((values) => {
     const fd = new FormData();
     Object.entries(values).forEach(([k, v]) => {
-      if (k === "interests" && Array.isArray(v))
+      if (k === "interests" && Array.isArray(v)) {
         v.forEach((i) => fd.append("interests", String(i)));
-      else if (typeof v === "boolean") fd.set(k, v ? "true" : "false");
-      else if (v != null) fd.set(k, String(v));
+      } else if (typeof v === "boolean") {
+        fd.set(k, v ? "true" : "false");
+      } else if (v != null) {
+        fd.set(k, String(v));
+      }
     });
     startTransition(() => formAction(fd));
   });
@@ -91,9 +103,9 @@ export default function OnboardingForm({
           <AvatarField control={form.control} userId={userId} />
 
           {/* Basic info */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* 1) Email — full-width row */}
-            <div className="sm:col-span-2">
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 min-w-0">
+            {/* Email — full-width row */}
+            <div className="sm:col-span-2 min-w-0">
               <Field label="Email" htmlFor={idEmail} required>
                 <Input
                   id={idEmail}
@@ -110,9 +122,9 @@ export default function OnboardingForm({
               </Field>
             </div>
 
-            {/* 2) Gender (small) + Full name (wide) in one row on sm+ */}
-            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
+            {/* Gender (small) + Full name (wide) */}
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 min-w-0">
+              <div className="min-w-0">
                 <SelectEnumField
                   control={form.control}
                   name="gender"
@@ -123,7 +135,7 @@ export default function OnboardingForm({
                   error={undefined}
                 />
               </div>
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 min-w-0">
                 <Field
                   label="Full name ( As it appears in college records )"
                   htmlFor={idFullName}
@@ -142,7 +154,7 @@ export default function OnboardingForm({
               </div>
             </div>
 
-            {/* 3) Phone — unchanged (full row inside its component) */}
+            {/* Phone (kept as-is; stacks code→number on mobile) */}
             <PhoneE164Field
               control={form.control}
               error={errors.phone_e164?.message as string | undefined}
@@ -150,88 +162,110 @@ export default function OnboardingForm({
               idLocal={React.useId()}
             />
 
-            <Field label="City" htmlFor={idCity}>
-              <Input
-                id={idCity}
-                {...form.register("city")}
-                placeholder="City"
-                autoComplete="address-level2"
+            {/* City + Country */}
+            <div className="min-w-0">
+              <Field label="City" htmlFor={idCity}>
+                <Input
+                  id={idCity}
+                  {...form.register("city")}
+                  placeholder="City"
+                  autoComplete="address-level2"
+                />
+              </Field>
+            </div>
+            <div className="min-w-0">
+              <SelectEnumField
+                control={form.control}
+                name="country"
+                label="Country"
+                options={COUNTRIES as unknown as string[]}
+                placeholder="Select country"
+                id={React.useId()}
+                error={undefined}
               />
-            </Field>
+            </div>
 
-            {/* Country (optional) */}
-            <SelectEnumField
-              control={form.control}
-              name="country"
-              label="Country"
-              options={COUNTRIES as unknown as string[]}
-              placeholder="Select country"
-              id={React.useId()}
-              error={undefined}
-            />
-
-            <SelectYearField
-              control={form.control}
-              id={idGradYear}
-              required
-              error={errors.graduation_year?.message as string | undefined}
-            />
-            <SelectEnumField
-              control={form.control}
-              name="degree"
-              label="Degree"
-              options={DEGREES as unknown as string[]}
-              required
-              id={React.useId()}
-              error={errors.degree?.message as string | undefined}
-            />
-
-            <SelectEnumField
-              control={form.control}
-              name="branch"
-              label="Branch"
-              options={BRANCHES as unknown as string[]}
-              required
-              id={React.useId()}
-              error={errors.branch?.message as string | undefined}
-            />
-
-            <Field label="Roll Number ( at REC/NIT Durgapur )" htmlFor={idRoll}>
-              <Input
-                id={idRoll}
-                {...form.register("roll_number")}
-                placeholder="(Valid Roll Number)"
+            {/* Graduation year + Degree */}
+            <div className="min-w-0">
+              <SelectYearField
+                control={form.control}
+                id={idGradYear}
+                required
+                error={errors.graduation_year?.message as string | undefined}
               />
-            </Field>
-
-            <SelectEnumField
-              control={form.control}
-              name="employment_type"
-              label="Employment type"
-              options={EMPLOYMENT_TYPES as unknown as string[]}
-              id={React.useId()}
-              error={undefined}
-            />
-
-            <Field label="Company" htmlFor={idCompany}>
-              <Input
-                id={idCompany}
-                {...form.register("company")}
-                placeholder="Company"
-                autoComplete="organization"
+            </div>
+            <div className="min-w-0">
+              <SelectEnumField
+                control={form.control}
+                name="degree"
+                label="Degree"
+                options={DEGREES as unknown as string[]}
+                required
+                id={React.useId()}
+                error={errors.degree?.message as string | undefined}
               />
-            </Field>
+            </div>
 
-            <Field label="Designation" htmlFor={idDesignation}>
-              <Input
-                id={idDesignation}
-                {...form.register("designation")}
-                placeholder="Role / Title"
-                autoComplete="organization-title"
+            {/* Branch + Roll */}
+            <div className="min-w-0">
+              <SelectEnumField
+                control={form.control}
+                name="branch"
+                label="Branch"
+                options={BRANCHES as unknown as string[]}
+                required
+                id={React.useId()}
+                error={errors.branch?.message as string | undefined}
               />
-            </Field>
+            </div>
+            <div className="min-w-0">
+              <Field label="Roll Number ( at REC/NIT Durgapur )" htmlFor={idRoll}>
+                <Input
+                  id={idRoll}
+                  {...form.register("roll_number")}
+                  placeholder="(Valid Roll Number)"
+                />
+              </Field>
+            </div>
+
+            {/* Employment type — full-width row */}
+            <div className="sm:col-span-2 min-w-0">
+              <SelectEnumField
+                control={form.control}
+                name="employment_type"
+                label="Employment type"
+                options={EMPLOYMENT_TYPES as unknown as string[]}
+                id={React.useId()}
+                error={undefined}
+              />
+            </div>
+
+            {/* Company + Designation */}
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 min-w-0">
+              <div className="min-w-0">
+                <Field label="Company" htmlFor={idCompany}>
+                  <Input
+                    id={idCompany}
+                    {...form.register("company")}
+                    placeholder="Company"
+                    autoComplete="organization"
+                  />
+                </Field>
+              </div>
+              <div className="min-w-0">
+                <Field label="Designation" htmlFor={idDesignation}>
+                  <Input
+                    id={idDesignation}
+                    {...form.register("designation")}
+                    placeholder="Role / Title"
+                    autoComplete="organization-title"
+                  />
+                </Field>
+              </div>
+            </div>
           </section>
 
+          {/* Interests + Consents (onboarding only) */}
           <InterestsGrid
             control={form.control}
             error={errors.interests?.message as string | undefined}
@@ -244,12 +278,13 @@ export default function OnboardingForm({
             error={errors.consent_terms_privacy?.message as string | undefined}
           />
 
-          {/* Action */}
-          {state?.error && (
+          {/* Server action error (auth/RLS/etc.) */}
+          {state && "error" in (state as any) && (state as any)?.error && (
             <p className="text-sm text-red-600" role="alert">
-              {state.error}
+              {(state as any).error}
             </p>
           )}
+
           <div className="flex items-center justify-end gap-3">
             <Button type="submit" disabled={isPending} aria-busy={isPending}>
               {isPending ? "Saving..." : "Save & continue"}
