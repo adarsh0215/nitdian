@@ -5,6 +5,8 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Loader2, UploadCloud, Trash2 } from "lucide-react";
 
+type StorageKey = { bucket: string; name: string } | null;
+
 export default function AvatarUploader({
   userId,
   value,
@@ -19,12 +21,14 @@ export default function AvatarUploader({
   const [error, setError] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
 
-  const ACCEPT = ["image/png", "image/jpeg", "image/webp"];
+  const ACCEPT: ReadonlyArray<string> = ["image/png", "image/jpeg", "image/webp"];
   const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 
-  const chooseFile = () => inputRef.current?.click();
+  const chooseFile = (): void => {
+    inputRef.current?.click();
+  };
 
-  function parseStorageKeyFromPublicUrl(url: string) {
+  function parseStorageKeyFromPublicUrl(url: string): StorageKey {
     try {
       const u = new URL(url);
       // Expected: /storage/v1/object/public/<bucket>/<path...>
@@ -41,7 +45,7 @@ export default function AvatarUploader({
     }
   }
 
-  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0];
     // allow re-picking the same file later
     if (inputRef.current) inputRef.current.value = "";
@@ -60,28 +64,25 @@ export default function AvatarUploader({
 
     setUploading(true);
     try {
-      const ext =
-        file.type === "image/png" ? "png" :
-        file.type === "image/webp" ? "webp" : "jpg";
-
+      const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
       const path = `avatars/${userId}.${ext}`;
+
       const { error: upErr } = await sb.storage
         .from("public")
         .upload(path, file, { upsert: true, contentType: file.type, cacheControl: "3600" });
-
       if (upErr) throw upErr;
 
       const { data } = sb.storage.from("public").getPublicUrl(path);
-      const nextUrl = `${data.publicUrl}?t=${Date.now()}`; // bust cache
+      const nextUrl = `${data.publicUrl}?t=${Date.now()}`; // bust cache for instant preview
       onChange(nextUrl);
-    } catch (err: any) {
-      setError(err?.message ?? "Upload failed. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
     } finally {
       setUploading(false);
     }
   };
 
-  const handleClear = async () => {
+  const handleClear = async (): Promise<void> => {
     if (!value) {
       onChange("");
       return;
@@ -97,10 +98,9 @@ export default function AvatarUploader({
       }
       onChange(""); // clear from form either way
       if (inputRef.current) inputRef.current.value = "";
-    } catch (err: any) {
-      // If delete fails (e.g., URL not ours), still clear the field
-      onChange("");
-      setError(err?.message ?? "Could not remove from storage, cleared locally.");
+    } catch (err: unknown) {
+      onChange(""); // still clear locally
+      setError(err instanceof Error ? err.message : "Could not remove from storage, cleared locally.");
     } finally {
       setUploading(false);
     }
@@ -170,7 +170,7 @@ export default function AvatarUploader({
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs">
-        <p className="text-muted-foreground">PNG, JPG or WEBP • Max 5MB • Square works best</p>
+        <p className="text-muted-foreground">PNG, JPG or WEBP • Max 5MB </p>
         {uploading ? <span className="text-muted-foreground">Please wait…</span> : null}
       </div>
 
