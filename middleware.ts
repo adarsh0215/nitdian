@@ -3,7 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 // Adjust as needed
-const PUBLIC_ROUTES = ["/", "/login", "/signup", "/auth/callback", "/policies/privacy", "/policies/terms" ];
+const PUBLIC_ROUTES = ["/", "/login", "/signup", "/auth/callback", "/policies/privacy", "/policies/terms", "/coming-soon" ];
+
+
 
 function isPublicPath(pathname: string) {
   return PUBLIC_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -22,6 +24,8 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next({
     request: { headers: req.headers },
   });
+
+  
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -73,6 +77,20 @@ export async function middleware(req: NextRequest) {
       isAdmin = Boolean(adminRow);
     }
   }
+
+   // ---- 0) Coming Soon gate (opt-in; safe defaults) ----
+  const endTime = process.env.NEXT_PUBLIC_COMING_SOON_UNTIL!
+  const launchTime = new Date(endTime).getTime(); // 6 PM IST = 12:30 UTC
+  const now = Date.now();
+
+  // If before launch, send users to coming-soon page
+  if (now < launchTime && !req.nextUrl.pathname.startsWith("/coming-soon")) {
+    return NextResponse.rewrite(new URL("/coming-soon", req.url));
+  }
+
+  return NextResponse.next();
+  
+
 
   // 1) Public routes are accessible to everyone.
   if (isPublicPath(pathname)) {
