@@ -26,8 +26,9 @@ export default function TermsContent() {
       {/* Section 3 */}
       <section>
         <h2 className="text-xl font-semibold mb-3">Acceptable Use</h2>
+        <p>You agree not to:</p>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-          <li>You agree not to:</li>
+          
           <li>
             Misuse the Portal for unlawful purposes.
           </li>
@@ -65,14 +66,18 @@ export default function TermsContent() {
       {/* Section 6 */}
       <section>
         <h2 className="text-xl font-semibold mb-3">Limitation of Liability</h2>
+        <p className="mb-1">The Chapter is not responsible for:</p>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-          <li>The Chapter is not responsible for:</li>
+          
           <li>
             Technical interruptions beyond its control.
 
           </li>
           <li>
             Personal decisions made based on information available on the Portal.
+          </li>
+          <li>
+            Any adverse, impacts, financial loses, physical injuries or damages of any kind while participating in any event or activity conducted by us.
           </li>
           
         </ul>

@@ -61,7 +61,7 @@ function FeaturedCard({ item }: { item: TestimonialItem }) {
       const fs = parseFloat(cs.fontSize || "16");
       const lhRaw = cs.lineHeight;
       const lh = lhRaw === "normal" || !lhRaw ? 1.5 * fs : parseFloat(lhRaw);
-      const max = Math.round(lh * 4 + 2); // 4 lines (tiny buffer)
+      const max = Math.round(lh * 5 + 2); // 4 lines (tiny buffer)
       setCollapsedMax(max);
       setContentHeight(el.scrollHeight);
       setCanExpand(el.scrollHeight > max + 1);
@@ -88,14 +88,14 @@ function FeaturedCard({ item }: { item: TestimonialItem }) {
       >
         {/* Left rail: avatar + identity (centered on md+) */}
         <div className="flex gap-4 md:flex-col md:items-center md:text-center">
-          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 bg-card ring-4 ring-background shadow-sm">
+          <Avatar className="h-20 w-20 sm:h-48 sm:w-48 bg-card ring-4 ring-background shadow-sm">
             {item.avatar ? <AvatarImage src={item.avatar} alt={item.author} /> : null}
             <AvatarFallback className="text-lg font-semibold">
               {initials(item.author)}
             </AvatarFallback>
           </Avatar>
 
-          <div className="min-w-0 space-y-1">
+          <div className="whitespace-pre-line min-w-0 space-y-1">
             <div className="text-lg font-semibold leading-tight text-balance">
               {item.author}
             </div>
@@ -118,10 +118,11 @@ function FeaturedCard({ item }: { item: TestimonialItem }) {
                 overflow: "hidden",
                 willChange: "max-height",
               }}
-              className="text-balance text-base sm:text-lg leading-relaxed"
+              className="whitespace-pre-line text-base sm:text-lg leading-relaxed"
             >
-              <span aria-hidden className="mr-1 text-2xl align-top select-none text-primary">“</span>
+              <span aria-hidden className="mr-1 text-2xl align-top select-none text-primary ">“</span>
               {item.quote}
+              
               <span aria-hidden className="ml-1 text-2xl align-bottom select-none text-primary">”</span>
             </div>
 

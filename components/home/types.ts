@@ -22,19 +22,19 @@ export type QuickActionItem = {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 };
 
-export type HighlightItem = {
-  quote: string;
-  author: string;
-  role?: string;
-  icon?: string; // icon-based avatar
-  avatar?: string | null;                                     // optional legacy support
-};
+// export type HighlightItem = {
+//   quote: string;
+//   author: string;
+//   role?: string;
+//   icon?: string; // icon-based avatar
+//   avatar?: string | null;                                     // optional legacy support
+// };
 
-export type HighlightData = {
-  heading: string;
-  subheading?: string;
-  items: HighlightItem[];
-};
+// export type HighlightData = {
+//   heading: string;
+//   subheading?: string;
+//   items: HighlightItem[];
+// };
 
 export type TestimonialItem = {
   quote: string;
@@ -44,11 +44,20 @@ export type TestimonialItem = {
   href: string;
 };
 
-export type FeaturedItem = HighlightItem;
 
+
+export type FeaturedItem = {
+  quote: string;
+  author: string;
+  role?: string;
+  year?: number | string;      // ✅ add this too (if used)
+  avatar?: string | null;
+};
+
+// If you have a wrapper:
 export type FeaturedData = {
   heading: string;
-  subheading: string;
+  subheading?: string;
   items: FeaturedItem[];
 };
 

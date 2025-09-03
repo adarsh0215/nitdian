@@ -137,12 +137,12 @@ export default function PrivacyContent() {
             applicable.
           </li>
           <li>
-            For requests, please contact{" "}
+            For requests, please contact us{" "}
             <a
               href="mailto:support@nitdian.org"
               className="underline hover:text-primary"
             >
-              support@nitdian.org
+              
             </a>
             .
           </li>
@@ -171,13 +171,8 @@ export default function PrivacyContent() {
             href="mailto:support@nitdian.org"
             className="underline hover:text-primary"
           >
-            support@nitdian.org
-          </a>
-          . You may also refer to our{" "}
-          <Link href="/terms" className="underline hover:text-primary">
-            Terms &amp; Conditions
-          </Link>{" "}
-          for additional information.
+            nitdiandelhi@gmail.com
+          </a>.
         </p>
       </section>
     </article>
