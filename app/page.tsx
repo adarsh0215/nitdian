@@ -10,6 +10,7 @@ import SiteFooter from "@/components/home/SiteFooter";
 // import Highlight from "@/components/home/Highlight";
 import Featured from "@/components/home/Featured";
 import { HOMEPAGE_DATA } from "@/components/home/data";
+import ImageTicker from "@/components/home/ImageTicker";
 
 export const metadata = {
   title: "Alumni Network — NIT Durgapur",
@@ -104,6 +105,11 @@ export default function Page() {
           />
         </div>
       </section>
+
+       <div className="max-w-7xl mx-auto px-4 py-10">
+      <h2 className="text-2xl font-bold mb-6 text-center">Our Alumni Moments</h2>
+      <ImageTicker />
+    </div>
 
       {/* How it works */}
       <section className="py-10 sm:py-14">
