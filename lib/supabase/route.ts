@@ -28,12 +28,14 @@ export function supabaseRoute(req: NextRequest) {
   const supabase = createServerClient(url, anon, {
     cookies: {
       getAll() {
-        return req.cookies.getAll().map((c) => ({ name: c.name, value: c.value }));
+        // Pass through request cookies
+        return req.cookies.getAll().map(({ name, value }) => ({ name, value }));
       },
-      setAll(cookies) {
-        cookies.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options as CookieOptions | undefined);
-        });
+      setAll(cookies: { name: string; value: string; options?: CookieOptions }[]) {
+        // Attach any cookies Supabase wants to set onto the response
+        for (const { name, value, options } of cookies) {
+          response.cookies.set(name, value, options);
+        }
       },
     },
   });

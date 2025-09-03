@@ -36,7 +36,6 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
     return two || "U";
   }, [name, email]);
 
-  // reset broken-image flag when URL changes
   React.useEffect(() => setImgErr(false), [avatarUrl]);
 
   const go = (href: string) => {
@@ -63,7 +62,6 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      {/* Default shadcn trigger renders a <button> — reliable and accessible */}
       <DropdownMenuTrigger
         className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1.5 text-sm hover:bg-muted transition-colors disabled:opacity-60"
         disabled={signingOut}

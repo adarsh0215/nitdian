@@ -39,8 +39,7 @@ function writeCookie(name: string, value: string, options?: CookieOptions) {
     parts.push("Secure");
   }
 
-  // Note: HttpOnly cannot be set from client-side JS; ignored by design.
-
+  // HttpOnly cannot be set from JS; intentionally omitted.
   document.cookie = parts.join("; ");
 }
 
@@ -75,7 +74,6 @@ export function supabaseBrowser() {
   assertEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", anon);
 
   _client = createBrowserClient(url, anon, {
-    // Read/write the same auth cookies as the server
     cookies: {
       get: readCookie,
       set: writeCookie,

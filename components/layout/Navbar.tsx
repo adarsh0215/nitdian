@@ -23,11 +23,7 @@ const NAV_LINKS = [
   { label: "Dashboard", href: "/dashboard" },
 ] as const;
 
-type ProfileMeta = {
-  full_name?: string;
-  avatar_url?: string;
-};
-
+type ProfileMeta = { full_name?: string; avatar_url?: string; };
 function getProfileMeta(meta: unknown): ProfileMeta {
   if (meta && typeof meta === "object") {
     const m = meta as Record<string, unknown>;
@@ -39,32 +35,20 @@ function getProfileMeta(meta: unknown): ProfileMeta {
   return {};
 }
 
-// Prefer generated types if you have them:
-// type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
-type ProfileRow = {
-  id: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  email: string | null;
-};
+// Prefer generated DB type if you have it.
+type ProfileRow = { id: string; full_name: string | null; avatar_url: string | null; email: string | null; };
+function isProfileRow(v: unknown): v is ProfileRow { return !!v && typeof v === "object" && "id" in v; }
 
-// Supabase types allow payload.new to be {} | T — narrow it.
-function isProfileRow(val: unknown): val is ProfileRow {
-  return !!val && typeof val === "object" && "id" in val;
-}
-
-export default function Navbar() {
+export default function Navbar({ initialPill = null }: { initialPill?: UserPillData | null }) {
   const pathname = usePathname();
   const router = useRouter();
-
   const supabase = React.useMemo(() => supabaseBrowser(), []);
+
   const [open, setOpen] = React.useState(false);
-
-  const [loadingUser, setLoadingUser] = React.useState(true);
-  const [pill, setPill] = React.useState<UserPillData | null>(null);
-
-  // Avoid “signed-in then overwritten by null” races
-  const seeded = React.useRef(false);
+  // ✅ seed from server (instant); client keeps it live
+  const [pill, setPill] = React.useState<UserPillData | null>(initialPill);
+  const [loadingUser, setLoadingUser] = React.useState(initialPill === null);
+  const seeded = React.useRef<boolean>(initialPill !== null);
 
   const pillFromUser = React.useCallback((user: User): UserPillData => {
     const { full_name, avatar_url } = getProfileMeta(user.user_metadata);
@@ -74,43 +58,35 @@ export default function Navbar() {
     return { name, email, avatarUrl };
   }, []);
 
-  const hydrateFromProfile = React.useCallback(
-    async (userId: string | null) => {
-      if (!userId) return;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, avatar_url, email")
-        .eq("id", userId)
-        .maybeSingle();
+  const hydrateFromProfile = React.useCallback(async (userId: string | null) => {
+    if (!userId) return;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, avatar_url, email")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profile) {
+      setPill((prev) => ({
+        name: profile.full_name || prev?.name || "Member",
+        email: profile.email || prev?.email || "",
+        avatarUrl: profile.avatar_url || prev?.avatarUrl || null,
+      }));
+    }
+  }, [supabase]);
 
-      if (profile) {
-        setPill((prev) => ({
-          name: profile.full_name || prev?.name || "Member",
-          email: profile.email || prev?.email || "",
-          avatarUrl: profile.avatar_url || prev?.avatarUrl || null,
-        }));
-      }
-    },
-    [supabase]
-  );
-
-  const setFromSession = React.useCallback(
-    (session: Session | null) => {
-      const user = session?.user ?? null;
-      if (user) {
-        setPill(pillFromUser(user));
-        setLoadingUser(false);
-        seeded.current = true;
-        void hydrateFromProfile(user.id);
-      }
-    },
-    [pillFromUser, hydrateFromProfile]
-  );
+  const setFromSession = React.useCallback((session: Session | null) => {
+    const user = session?.user ?? null;
+    if (user) {
+      setPill(pillFromUser(user));
+      setLoadingUser(false);
+      seeded.current = true;
+      void hydrateFromProfile(user.id);
+    }
+  }, [pillFromUser, hydrateFromProfile]);
 
   React.useEffect(() => {
     let cancelled = false;
 
-    // 1) Auth subscription — ignore null INITIAL_SESSION
     const { data: authSub } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session: Session | null) => {
         if (cancelled) return;
@@ -121,7 +97,6 @@ export default function Navbar() {
           router.refresh();
           return;
         }
-
         if (event === "SIGNED_OUT") {
           seeded.current = true;
           setPill(null);
@@ -129,7 +104,6 @@ export default function Navbar() {
           router.refresh();
           return;
         }
-
         if (event === "INITIAL_SESSION" && session?.user) {
           setFromSession(session);
           setLoadingUser(false);
@@ -137,8 +111,9 @@ export default function Navbar() {
       }
     );
 
-    // 2) Immediate seed from in-memory user (fast, no network)
+    // Quick seed from browser client if server seed wasn't present
     (async () => {
+      if (seeded.current) return;
       const { data } = await supabase.auth.getUser();
       if (cancelled) return;
       if (data.user) {
@@ -149,7 +124,6 @@ export default function Navbar() {
       }
     })();
 
-    // 3) Fallback — if nothing seeded within 1.2s, show logged-out UI
     const fallback = setTimeout(() => {
       if (!seeded.current && !cancelled) {
         setPill(null);
@@ -157,7 +131,6 @@ export default function Navbar() {
       }
     }, 1200);
 
-    // 4) Live updates when my profile row changes
     let profileChannel: ReturnType<typeof supabase.channel> | null = null;
     (async () => {
       const { data } = await supabase.auth.getUser();
@@ -182,7 +155,6 @@ export default function Navbar() {
         .subscribe();
     })();
 
-    // 5) Local custom event (optional bridge from onboarding form)
     type ProfileUpdatedDetail = Partial<UserPillData>;
     const onProfileUpdated = (e: Event) => {
       const ce = e as CustomEvent<ProfileUpdatedDetail>;
@@ -195,7 +167,6 @@ export default function Navbar() {
     };
     window.addEventListener("profile:updated", onProfileUpdated);
 
-    // Also re-check session when tab becomes visible (some providers set cookies late)
     const onVis = async () => {
       if (document.visibilityState !== "visible" || seeded.current) return;
       const { data } = await supabase.auth.getUser();
@@ -223,13 +194,7 @@ export default function Navbar() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" aria-label="NIT Durgapur" className="flex items-center gap-2 md:justify-self-start">
-          <Image
-            src="/images/logo.png"
-            alt="Logo"
-            width={40}
-            height={40}
-            className="h-10 w-10 object-contain rounded-lg hairline bg-surface"
-          />
+          <Image src="/images/logo.png" alt="Logo" width={40} height={40} className="h-10 w-10 object-contain rounded-lg hairline bg-surface" />
           <div className="hidden sm:flex flex-col leading-tight min-w-0">
             <span className="truncate text-base font-semibold tracking-tight">NIT Durgapur</span>
             <span className="truncate text-xs sm:text-sm text-muted-foreground">International Alumni Network</span>
@@ -258,7 +223,6 @@ export default function Navbar() {
         {/* Right controls */}
         <div className="flex items-center gap-2">
           <ThemeSwitcher />
-
           {loadingUser ? (
             <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
           ) : pill ? (
@@ -268,11 +232,11 @@ export default function Navbar() {
               <Button size="sm" variant="outline" asChild>
                 <Link href="/signup">Sign up</Link>
               </Button>
-              <Button size="sm" onClick={() => router.push("/login")}>Login</Button>
+              <Button size="sm" onClick={() => router.push("/login")}>
+                Login
+              </Button>
             </div>
           )}
-
-          {/* Mobile menu toggle */}
           <button
             className="md:hidden inline-flex items-center justify-center rounded-md p-2 hover:bg-muted"
             onClick={() => setOpen((v) => !v)}
@@ -303,7 +267,6 @@ export default function Navbar() {
                 </Link>
               );
             })}
-
             {pill ? (
               <div className="pt-2 text-xs text-muted-foreground">Signed in as {pill.email}</div>
             ) : (

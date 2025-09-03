@@ -6,7 +6,6 @@ function assertEnv(name: string, value: string | undefined): asserts value is st
   if (!value) throw new Error(`Missing env: ${name}`);
 }
 
-// Options shape expected by Next's cookies().set
 type NextCookieOptions = {
   domain?: string;
   path?: string;
@@ -24,7 +23,6 @@ function toNextCookieOptions(opts?: CookieOptions): NextCookieOptions | undefine
     domain,
     path,
     maxAge,
-    // normalize to Date to satisfy Next types
     expires: typeof expires === "string" ? new Date(expires) : (expires as Date | undefined),
     httpOnly,
     secure,
@@ -32,17 +30,13 @@ function toNextCookieOptions(opts?: CookieOptions): NextCookieOptions | undefine
   };
 }
 
-/**
- * Server-side supabase client for RSC / server actions.
- * Must be called within a server context (not at module top-level).
- */
 export async function supabaseServer() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   assertEnv("NEXT_PUBLIC_SUPABASE_URL", url);
   assertEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", anon);
 
-  // In your env, cookies() returns a Promise — await it.
+  // In your env, cookies() is async
   const cookieStore = await cookies();
 
   return createServerClient(url, anon, {
@@ -56,11 +50,7 @@ export async function supabaseServer() {
       },
       remove(name: string, options?: CookieOptions) {
         const base = toNextCookieOptions(options) ?? { path: "/" };
-        cookieStore.set(name, "", {
-          ...base,
-          maxAge: 0,
-          expires: new Date(0),
-        });
+        cookieStore.set(name, "", { ...base, maxAge: 0, expires: new Date(0) });
       },
     },
   });
