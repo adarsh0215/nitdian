@@ -10,13 +10,18 @@ import { Button } from "@/components/ui/button";
 import ThemeSwitcher from "@/components/ui/theme-switcher";
 import UserPill, { type UserPillData } from "@/components/layout/UserPill";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
+import type {
+  AuthChangeEvent,
+  Session,
+  User,
+  RealtimePostgresChangesPayload,
+} from "@supabase/supabase-js";
 
 const NAV_LINKS = [
   { label: "Home", href: "/" },
   { label: "Directory", href: "/directory" },
   { label: "Dashboard", href: "/dashboard" },
-];
+] as const;
 
 type ProfileMeta = {
   full_name?: string;
@@ -34,6 +39,20 @@ function getProfileMeta(meta: unknown): ProfileMeta {
   return {};
 }
 
+// Prefer generated types if you have them:
+// type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
+};
+
+// Supabase types allow payload.new to be {} | T — narrow it.
+function isProfileRow(val: unknown): val is ProfileRow {
+  return !!val && typeof val === "object" && "id" in val;
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -41,9 +60,11 @@ export default function Navbar() {
   const supabase = React.useMemo(() => supabaseBrowser(), []);
   const [open, setOpen] = React.useState(false);
 
-  // Important: start "loading" and don't show logged-out UI until we know for sure
   const [loadingUser, setLoadingUser] = React.useState(true);
   const [pill, setPill] = React.useState<UserPillData | null>(null);
+
+  // Avoid “signed-in then overwritten by null” races
+  const seeded = React.useRef(false);
 
   const pillFromUser = React.useCallback((user: User): UserPillData => {
     const { full_name, avatar_url } = getProfileMeta(user.user_metadata);
@@ -73,55 +94,95 @@ export default function Navbar() {
     [supabase]
   );
 
-  React.useEffect(() => {
-    let cancelled = false;
-    let gotInitialEvent = false;
-
-    // 1) Subscribe to auth changes (fires very early with INITIAL_SESSION)
-    const { data: sub } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, session: Session | null) => {
-        if (cancelled) return;
-
-        if (event === "INITIAL_SESSION") gotInitialEvent = true;
-
-        const user = session?.user ?? null;
-        if (user) {
-          setPill(pillFromUser(user));
-          setLoadingUser(false);
-          // hydrate friendly name/avatar from profiles (async)
-          hydrateFromProfile(user.id);
-        } else {
-          // Only mark logged out after we KNOW initial session is resolved
-          if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
-            setPill(null);
-            setLoadingUser(false);
-          }
-        }
-
-        // Refresh server components if they depend on auth cookies
-        router.refresh();
-      }
-    );
-
-    // 2) Seed quickly from local (no network)
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const user = data.session?.user ?? null;
+  const setFromSession = React.useCallback(
+    (session: Session | null) => {
+      const user = session?.user ?? null;
       if (user) {
         setPill(pillFromUser(user));
         setLoadingUser(false);
-        hydrateFromProfile(user.id);
+        seeded.current = true;
+        void hydrateFromProfile(user.id);
+      }
+    },
+    [pillFromUser, hydrateFromProfile]
+  );
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    // 1) Auth subscription — ignore null INITIAL_SESSION
+    const { data: authSub } = supabase.auth.onAuthStateChange(
+      async (event: AuthChangeEvent, session: Session | null) => {
+        if (cancelled) return;
+
+        if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
+          setFromSession(session);
+          setLoadingUser(false);
+          router.refresh();
+          return;
+        }
+
+        if (event === "SIGNED_OUT") {
+          seeded.current = true;
+          setPill(null);
+          setLoadingUser(false);
+          router.refresh();
+          return;
+        }
+
+        if (event === "INITIAL_SESSION" && session?.user) {
+          setFromSession(session);
+          setLoadingUser(false);
+        }
+      }
+    );
+
+    // 2) Immediate seed from in-memory user (fast, no network)
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (data.user) {
+        setPill(pillFromUser(data.user));
+        setLoadingUser(false);
+        seeded.current = true;
+        void hydrateFromProfile(data.user.id);
       }
     })();
 
-    // 3) Fallback if INITIAL_SESSION never arrives
+    // 3) Fallback — if nothing seeded within 1.2s, show logged-out UI
     const fallback = setTimeout(() => {
-      if (!gotInitialEvent && !cancelled) {
+      if (!seeded.current && !cancelled) {
+        setPill(null);
         setLoadingUser(false);
       }
     }, 1200);
 
-    // 4) Instant profile updates right after onboarding save
+    // 4) Live updates when my profile row changes
+    let profileChannel: ReturnType<typeof supabase.channel> | null = null;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const me = data.user;
+      if (!me || cancelled) return;
+
+      profileChannel = supabase
+        .channel("profiles:me")
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${me.id}` },
+          (payload: RealtimePostgresChangesPayload<ProfileRow>) => {
+            const next = payload.new;
+            if (!isProfileRow(next)) return;
+            setPill((prev) => ({
+              name: next.full_name ?? prev?.name ?? "Member",
+              email: next.email ?? prev?.email ?? "",
+              avatarUrl: next.avatar_url ?? prev?.avatarUrl ?? null,
+            }));
+          }
+        )
+        .subscribe();
+    })();
+
+    // 5) Local custom event (optional bridge from onboarding form)
     type ProfileUpdatedDetail = Partial<UserPillData>;
     const onProfileUpdated = (e: Event) => {
       const ce = e as CustomEvent<ProfileUpdatedDetail>;
@@ -134,23 +195,34 @@ export default function Navbar() {
     };
     window.addEventListener("profile:updated", onProfileUpdated);
 
+    // Also re-check session when tab becomes visible (some providers set cookies late)
+    const onVis = async () => {
+      if (document.visibilityState !== "visible" || seeded.current) return;
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        setPill(pillFromUser(data.user));
+        setLoadingUser(false);
+        seeded.current = true;
+        void hydrateFromProfile(data.user.id);
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+
     return () => {
       cancelled = true;
       clearTimeout(fallback);
       window.removeEventListener("profile:updated", onProfileUpdated);
-      sub.subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", onVis);
+      authSub.subscription.unsubscribe();
+      if (profileChannel) supabase.removeChannel(profileChannel);
     };
-  }, [supabase, pillFromUser, hydrateFromProfile, router]);
+  }, [supabase, pillFromUser, setFromSession, hydrateFromProfile, router]);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <Link
-          href="/"
-          aria-label="NIT Durgapur"
-          className="flex items-center gap-2 md:justify-self-start"
-        >
+        <Link href="/" aria-label="NIT Durgapur" className="flex items-center gap-2 md:justify-self-start">
           <Image
             src="/images/logo.png"
             alt="Logo"
@@ -159,12 +231,8 @@ export default function Navbar() {
             className="h-10 w-10 object-contain rounded-lg hairline bg-surface"
           />
           <div className="hidden sm:flex flex-col leading-tight min-w-0">
-            <span className="truncate text-base font-semibold tracking-tight">
-              NIT Durgapur
-            </span>
-            <span className="truncate text-xs sm:text-sm text-muted-foreground">
-              International Alumni Network
-            </span>
+            <span className="truncate text-base font-semibold tracking-tight">NIT Durgapur</span>
+            <span className="truncate text-xs sm:text-sm text-muted-foreground">International Alumni Network</span>
           </div>
         </Link>
 
@@ -194,15 +262,13 @@ export default function Navbar() {
           {loadingUser ? (
             <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
           ) : pill ? (
-            <UserPill {...pill} />
+            <UserPill key={pill.email || pill.name} {...pill} />
           ) : (
             <div className="hidden md:flex items-center gap-2">
               <Button size="sm" variant="outline" asChild>
                 <Link href="/signup">Sign up</Link>
               </Button>
-              <Button size="sm" onClick={() => router.push("/login")}>
-                Login
-              </Button>
+              <Button size="sm" onClick={() => router.push("/login")}>Login</Button>
             </div>
           )}
 
@@ -239,20 +305,14 @@ export default function Navbar() {
             })}
 
             {pill ? (
-              <div className="pt-2 text-xs text-muted-foreground">
-                Signed in as {pill.email}
-              </div>
+              <div className="pt-2 text-xs text-muted-foreground">Signed in as {pill.email}</div>
             ) : (
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <Button size="sm" variant="outline" asChild>
-                  <Link href="/signup" onClick={() => setOpen(false)}>
-                    Sign up
-                  </Link>
+                  <Link href="/signup" onClick={() => setOpen(false)}>Sign up</Link>
                 </Button>
                 <Button size="sm" asChild>
-                  <Link href="/login" onClick={() => setOpen(false)}>
-                    Login
-                  </Link>
+                  <Link href="/login" onClick={() => setOpen(false)}>Login</Link>
                 </Button>
               </div>
             )}

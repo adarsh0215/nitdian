@@ -24,6 +24,7 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
   const router = useRouter();
   const [signingOut, setSigningOut] = React.useState(false);
   const [open, setOpen] = React.useState(false);
+  const [imgErr, setImgErr] = React.useState(false);
 
   const initials = React.useMemo(() => {
     const n = (name || "").trim();
@@ -34,6 +35,9 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
     const two = (a + b).toUpperCase();
     return two || "U";
   }, [name, email]);
+
+  // reset broken-image flag when URL changes
+  React.useEffect(() => setImgErr(false), [avatarUrl]);
 
   const go = (href: string) => {
     setOpen(false);
@@ -46,23 +50,12 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
     setOpen(false);
     try {
       const supabase = supabaseBrowser();
-
-      // Run both in parallel to cut perceived delay
       await Promise.allSettled([
         supabase.auth.signOut({ scope: "global" }),
-        fetch("/auth/callback/signout", {
-          method: "POST",
-          credentials: "include",
-        }),
+        fetch("/auth/callback/signout", { method: "POST", credentials: "include" }),
       ]);
-
-      // Refresh any server-rendered bits and send to login
-      router.refresh();
       router.replace("/login");
-    } catch {
-      // Even on error, try to refresh to reflect best-known state
       router.refresh();
-      router.replace("/login");
     } finally {
       setSigningOut(false);
     }
@@ -70,6 +63,7 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
+      {/* Default shadcn trigger renders a <button> — reliable and accessible */}
       <DropdownMenuTrigger
         className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-2 py-1.5 text-sm hover:bg-muted transition-colors disabled:opacity-60"
         disabled={signingOut}
@@ -77,24 +71,25 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         aria-label={signingOut ? "Signing out" : `User menu for ${name || email}`}
       >
         <Avatar className="h-7 w-7">
-          {avatarUrl ? (
+          {avatarUrl && !imgErr ? (
             <AvatarImage
               src={avatarUrl}
               alt={name || "User avatar"}
               referrerPolicy="no-referrer"
+              onError={() => setImgErr(true)}
             />
           ) : (
             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
           )}
         </Avatar>
-        <span className="hidden sm:inline-block max-w-[140px] truncate" title={name}>
-          {name}
+        <span className="hidden sm:inline-block max-w-[140px] truncate" title={name || email}>
+          {name || email}
         </span>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="truncate" title={name}>
-          {name}
+        <DropdownMenuLabel className="truncate" title={name || "Member"}>
+          {name || "Member"}
         </DropdownMenuLabel>
         <div className="px-2 pb-2 text-xs text-muted-foreground truncate" title={email}>
           {email}

@@ -6,6 +6,32 @@ function assertEnv(name: string, value: string | undefined): asserts value is st
   if (!value) throw new Error(`Missing env: ${name}`);
 }
 
+// Options shape expected by Next's cookies().set
+type NextCookieOptions = {
+  domain?: string;
+  path?: string;
+  maxAge?: number;
+  expires?: Date;
+  httpOnly?: boolean;
+  secure?: boolean;
+  sameSite?: "lax" | "strict" | "none";
+};
+
+function toNextCookieOptions(opts?: CookieOptions): NextCookieOptions | undefined {
+  if (!opts) return undefined;
+  const { domain, path, maxAge, expires, httpOnly, secure, sameSite } = opts;
+  return {
+    domain,
+    path,
+    maxAge,
+    // normalize to Date to satisfy Next types
+    expires: typeof expires === "string" ? new Date(expires) : (expires as Date | undefined),
+    httpOnly,
+    secure,
+    sameSite: sameSite as NextCookieOptions["sameSite"] | undefined,
+  };
+}
+
 /**
  * Server-side supabase client for RSC / server actions.
  * Must be called within a server context (not at module top-level).
@@ -16,6 +42,7 @@ export async function supabaseServer() {
   assertEnv("NEXT_PUBLIC_SUPABASE_URL", url);
   assertEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", anon);
 
+  // In your env, cookies() returns a Promise — await it.
   const cookieStore = await cookies();
 
   return createServerClient(url, anon, {
@@ -23,11 +50,17 @@ export async function supabaseServer() {
       get(name: string) {
         return cookieStore.get(name)?.value;
       },
-      set(name: string, value: string, options: CookieOptions) {
-        cookieStore.set(name, value, options);
+      set(name: string, value: string, options?: CookieOptions) {
+        const mapped = toNextCookieOptions(options);
+        mapped ? cookieStore.set(name, value, mapped) : cookieStore.set(name, value);
       },
-      remove(name: string, options: CookieOptions) {
-        cookieStore.set(name, "", { ...options, maxAge: 0, expires: new Date(0) });
+      remove(name: string, options?: CookieOptions) {
+        const base = toNextCookieOptions(options) ?? { path: "/" };
+        cookieStore.set(name, "", {
+          ...base,
+          maxAge: 0,
+          expires: new Date(0),
+        });
       },
     },
   });
