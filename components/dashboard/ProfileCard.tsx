@@ -140,7 +140,7 @@ export default function ProfileCard({ profile }: { profile: Profile }) {
               {isPublic ? "Public" : "Private"}
             </Badge>
             <Button asChild size="sm" variant="ghost" className="h-8 px-2">
-              <Link href="/onboarding">Edit</Link>
+              <Link href="/profile">Edit</Link>
             </Button>
           </div>
         </div>
@@ -164,7 +164,7 @@ export default function ProfileCard({ profile }: { profile: Profile }) {
               {missing.length > 3 ? "…" : ""}
             </span>
             <Button asChild variant="link" className="h-auto p-0 text-xs">
-              <Link href="/onboarding">Complete now</Link>
+              <Link href="/profile">Complete now</Link>
             </Button>
           </div>
         )}

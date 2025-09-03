@@ -32,7 +32,17 @@ import InterestsGrid from "@/components/onboarding/fields/InterestsGrid";
 import DirectoryConsents from "@/components/onboarding/fields/DirectoryConsents";
 import SelectYearField from "@/components/onboarding/fields/SelectYearField";
 
+// Derive the action result and add type guards to avoid `any`
 type ActionResult = Awaited<ReturnType<typeof saveProfile>>;
+type OkResult = Extract<NonNullable<ActionResult>, { ok: true }>;
+type ErrResult = Extract<NonNullable<ActionResult>, { ok: false; error: string }>;
+
+function isOkResult(r: ActionResult): r is OkResult {
+  return !!r && typeof (r as { ok?: boolean }).ok === "boolean" && (r as { ok: boolean }).ok === true;
+}
+function isErrResult(r: ActionResult): r is ErrResult {
+  return !!r && typeof (r as { ok?: boolean }).ok === "boolean" && (r as { ok: boolean }).ok === false;
+}
 
 export default function ProfileForm({
   userEmail,
@@ -72,7 +82,6 @@ export default function ProfileForm({
             company: val.company ?? "",
             designation: val.designation ?? "",
             avatar_url: val.avatar_url ?? undefined,
-            // ✅ Narrow interests to the union type
             interests: Array.isArray(val.interests)
               ? (val.interests.filter(isAllowedInterest) as OnboardingValues["interests"])
               : ([] as OnboardingValues["interests"]),
@@ -101,9 +110,9 @@ export default function ProfileForm({
   );
   const [isPending, startTransition] = React.useTransition();
 
-  // ✅ Redirect to dashboard after successful save
+  // Redirect to dashboard after successful save
   React.useEffect(() => {
-    if (state && typeof state === "object" && "ok" in state && state.ok) {
+    if (isOkResult(state)) {
       router.push("/dashboard");
     }
   }, [state, router]);
@@ -127,7 +136,8 @@ export default function ProfileForm({
         fd.set(k, String(v));
       }
     });
-    fd.set("consent_terms_privacy", "true"); // required for schema
+    // For profile edits, schema accepts optional; we keep it true for consistency.
+    fd.set("consent_terms_privacy", "true");
 
     startTransition(() => formAction(fd));
   });
@@ -330,9 +340,9 @@ export default function ProfileForm({
           <DirectoryConsents control={form.control} />
 
           {/* Server action error */}
-          {state && typeof state === "object" && "ok" in state && !state.ok && (state as any).error && (
+          {isErrResult(state) && (
             <p className="text-sm text-red-600" role="alert">
-              {(state as any).error}
+              {state.error}
             </p>
           )}
 
