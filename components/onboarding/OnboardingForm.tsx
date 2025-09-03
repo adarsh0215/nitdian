@@ -31,8 +31,15 @@ import DirectoryConsents from "./fields/DirectoryConsents";
 import TermsCheckbox from "./fields/TermsCheckbox";
 import SelectYearField from "./fields/SelectYearField";
 
-// >>> derive the action's result type from the server action itself
+// Derive the action's result type from the server action itself
 type ActionResult = Awaited<ReturnType<typeof saveOnboarding>>;
+type ErrResult = Extract<NonNullable<ActionResult>, { ok: false; error: string }>;
+
+function isErrResult(r: ActionResult): r is ErrResult {
+  if (r == null || typeof r !== "object") return false;
+  const rec = r as { ok?: unknown; error?: unknown };
+  return rec.ok === false && typeof rec.error === "string";
+}
 
 export default function OnboardingForm({
   userEmail,
@@ -59,8 +66,7 @@ export default function OnboardingForm({
   // Focus/scroll to first invalid control on validation error
   React.useEffect(() => {
     const firstInvalid = document.querySelector<HTMLElement>("[aria-invalid='true']");
-    // Some TS DOM libs type focus() without options; call without args
-    firstInvalid?.focus();
+    firstInvalid?.focus(); // options-less for broad DOM lib compat
     firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [form.formState.errors]);
 
@@ -279,9 +285,9 @@ export default function OnboardingForm({
           />
 
           {/* Server action error (auth/RLS/etc.) */}
-          {state && "error" in (state as any) && (state as any)?.error && (
+          {isErrResult(state) && (
             <p className="text-sm text-red-600" role="alert">
-              {(state as any).error}
+              {state.error}
             </p>
           )}
 
