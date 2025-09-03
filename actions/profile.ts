@@ -17,6 +17,9 @@ function parseFromForm(formData: FormData):
   const picks = {
     full_name: String(raw.full_name || ""),
     email: String(raw.email || ""),
+    // NEW 👇 gender (optional)
+    gender: raw.gender ? String(raw.gender) : undefined,
+
     phone_e164: String(raw.phone_e164 || ""),
     city: String(raw.city || ""),
     country: String(raw.country || ""),
@@ -69,6 +72,9 @@ async function upsertProfileBase(opts: {
     id: user.id,
     email: v.email,
     full_name: v.full_name,
+    // NEW 👇 persist gender
+    gender: v.gender ?? null,
+
     phone_e164: v.phone_e164 || null,
     city: v.city || null,
     country: v.country || null,
@@ -131,4 +137,3 @@ export async function saveProfile(_prev: Result, formData: FormData): Promise<Re
   // ✅ redirect after successful update
   redirect("/dashboard");
 }
-

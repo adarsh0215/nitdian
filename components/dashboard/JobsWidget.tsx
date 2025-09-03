@@ -40,9 +40,9 @@ export default function JobsWidget({
               <Briefcase className="h-4 w-4" />
               No jobs yet.
             </span>
-            <Button asChild size="sm" disabled={!isApproved}>
+            {/* <Button asChild size="sm" disabled={!isApproved}>
               <Link href={isApproved ? "/jobs/new" : "#"}>Post a job</Link>
-            </Button>
+            </Button> */}
           </div>
         ) : (
           <ul className="space-y-2">

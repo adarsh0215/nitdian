@@ -25,7 +25,6 @@ export default function PhoneE164Field({
   idCode: string;
   idLocal: string;
 }) {
-  // ✅ Watch the raw value at top-level (allowed)
   const raw = useWatch({ control, name: "phone_e164" });
 
   const [phoneCode, setPhoneCode] = React.useState<string>(COUNTRY_CALLING_CODES[0].code);
@@ -58,10 +57,20 @@ export default function PhoneE164Field({
       render={({ field }) => (
         <div className="sm:col-span-2">
           <Field label="Phone" required error={error}>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <Select value={phoneCode} onValueChange={(v) => update(field.onChange, v, phoneLocal)}>
-                  <SelectTrigger id={idCode} aria-label="Country code" aria-required="true">
+            {/* Mobile: 1 column (code on top, number below); sm+: 3 columns */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* Country code select */}
+              <div className="min-w-0">
+                <Select
+                  value={phoneCode}
+                  onValueChange={(v) => update(field.onChange, v, phoneLocal)}
+                >
+                  <SelectTrigger
+                    id={idCode}
+                    className="w-full"
+                    aria-label="Country code"
+                    aria-required="true"
+                  >
                     <SelectValue placeholder="Code" />
                   </SelectTrigger>
                   <SelectContent className="max-h-72">
@@ -73,9 +82,12 @@ export default function PhoneE164Field({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2">
+
+              {/* Local number */}
+              <div className="sm:col-span-2 min-w-0">
                 <Input
                   id={idLocal}
+                  className="w-full"
                   value={phoneLocal}
                   onChange={(e) => update(field.onChange, phoneCode, e.target.value)}
                   placeholder="XXXXXXXXXX"
@@ -86,6 +98,7 @@ export default function PhoneE164Field({
                 />
               </div>
             </div>
+
             {error ? (
               <p className="mt-1 text-xs text-red-600" role="alert">
                 {error}

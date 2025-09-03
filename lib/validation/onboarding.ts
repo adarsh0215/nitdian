@@ -2,7 +2,10 @@
 import { z } from "zod";
 
 /* ---------- Option sources ---------- */
-export const DEGREES = ["B.Tech", "M.Tech", "MBA", "PhD", "Other"] as const;
+export const DEGREES = ["B.Tech", "B.E", "M.E", "M.Tech", "MBA", "PhD",  "Other"] as const;
+
+// NEW 👇
+export const GENDERS = ["Male", "Female", "Other", "Prefer not to say"] as const;
 
 export const BRANCHES = [
   "Biotechnology",
@@ -118,7 +121,7 @@ const trimOrUndef = (v: unknown) =>
   typeof v === "string" ? (v.trim() === "" ? undefined : v.trim()) : v;
 
 const phoneSanitize = (v: unknown) =>
-  typeof v === "string" ? v.replace(/[\s()-]/g, "") : v;
+  typeof v === "string" ? v.replace(/[\               s()-]/g, "") : v;
 
 /* E.164-ish (8–15 digits, optional +) */
 const phoneRegex = /^\+?[1-9]\d{7,14}$/;
@@ -135,6 +138,9 @@ export const OnboardingSchema = z
       .string()
       .transform((s) => s.trim().toLowerCase())
       .pipe(z.string().email("Enter a valid email")),
+
+    // NEW 👇 optional gender
+    gender: z.enum(GENDERS).optional(),
 
     // phone required: sanitize + validate E.164
     phone_e164: z
@@ -153,29 +159,18 @@ export const OnboardingSchema = z
     country: z.preprocess(trimOrUndef, z.string().optional()),
 
     // education
-    // required logically, but allow undefined in type so defaults can be empty
     graduation_year: z
       .preprocess(
         (v) => (v == null || String(v).trim() === "" ? undefined : v),
-        z.coerce
-          .number()
-          .int()
-          .min(1961, "Enter a valid year")
-          .max(CURRENT_YEAR, "Enter a valid year")
+        z.coerce.number().int().min(1965, "Enter a valid year").max(CURRENT_YEAR + 3, "Enter a valid year")
       )
       .optional()
       .refine((v) => v !== undefined, { message: "Graduation year is required" })
       .transform((v) => v as number),
 
-    // degree / branch required (same trick: optional at type level, required by refine)
-    degree: z
-      .enum(DEGREES)
-      .optional()
-      .refine((v) => v !== undefined, { message: "Degree is required" }),
-    branch: z
-      .enum(BRANCHES)
-      .optional()
-      .refine((v) => v !== undefined, { message: "Branch is required" }),
+    // degree / branch required
+    degree: z.enum(DEGREES).optional().refine((v) => v !== undefined, { message: "Degree is required" }),
+    branch: z.enum(BRANCHES).optional().refine((v) => v !== undefined, { message: "Branch is required" }),
 
     roll_number: z.preprocess(trimOrUndef, z.string().optional()),
 
@@ -185,20 +180,15 @@ export const OnboardingSchema = z
     designation: z.preprocess(trimOrUndef, z.string().optional()),
 
     // media
-    avatar_url: z
-      .union([z.string().url(), z.literal(""), z.undefined()])
-      .transform((v) => (v === "" ? undefined : v))
-      .optional(),
+    avatar_url: z.union([z.string().url(), z.literal(""), z.undefined()]).transform((v) => (v === "" ? undefined : v)).optional(),
 
     // interests — at least one required
     interests: z.array(z.enum(INTERESTS)).min(1, "Select at least one area of interest"),
 
     /* consents */
-    consent_terms_privacy: z
-      .boolean()
-      .refine((v) => v === true, {
-        message: "You must accept Terms & Privacy to continue",
-      }),
+    consent_terms_privacy: z.boolean().refine((v) => v === true, {
+      message: "You must accept Terms & Privacy to continue",
+    }),
     consent_directory_visible: z.boolean().default(false),
     consent_directory_show_contacts: z.boolean().default(false),
   })
@@ -221,10 +211,13 @@ export function toFormDefaults(email?: string): OnboardingValues {
   return {
     full_name: "",
     email: email ?? "",
-    phone_e164: "", // required -> start empty
+    // NEW 👇 start empty (optional)
+    gender: undefined as unknown as (typeof GENDERS)[number],
+
+    phone_e164: "",
     city: "",
     country: "",
-    graduation_year: undefined as unknown as number, // user will fill; schema enforces required
+    graduation_year: undefined as unknown as number,
     degree: undefined as unknown as (typeof DEGREES)[number],
     branch: undefined as unknown as (typeof BRANCHES)[number],
     roll_number: "",
@@ -232,7 +225,7 @@ export function toFormDefaults(email?: string): OnboardingValues {
     company: "",
     designation: "",
     avatar_url: undefined,
-    interests: [], // required -> must select ≥1
+    interests: [],
     consent_terms_privacy: false,
     consent_directory_visible: true,
     consent_directory_show_contacts: true,

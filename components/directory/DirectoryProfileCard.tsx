@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Briefcase, MapPin } from "lucide-react";
+
 import type { DirectoryItem } from "./DirectoryClient";
 
 const cn = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(" ");
@@ -80,23 +80,29 @@ export default function DirectoryProfileCard({
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-semibold leading-6">{name}</h3>
 
-          {headline ? (
-            <div className="mt-1 flex items-start gap-2 text-[15px] leading-6">
-              <Briefcase className="mt-[2px] h-4 w-4 shrink-0 opacity-70" />
-              <p className="font-medium text-primary">{headline}</p>
-            </div>
-          ) : null}
-
           {second ? (
-            <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{second}</p>
+            <div className="mt-1 flex items-start gap-2 text-[15px] leading-6">
+              <p className="text-sm ">{second}</p>
+            </div>
+            
           ) : null}
 
           {location ? (
-            <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4 opacity-70" />
+            <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
               {location}
             </p>
           ) : null}
+
+          {headline ? (
+            <div className="mt-1 flex items-start gap-2 text-[15px] leading-6">
+              
+              <p className="mt-2 text-sm text-muted-foreground line-clamp-1">{headline}</p>
+            </div>
+          ) : null}
+
+          
+
+          
         </div>
       </div>
     </article>

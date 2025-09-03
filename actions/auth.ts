@@ -14,7 +14,7 @@ function preferDashboard(p?: string | null) {
   return s && s !== "/" ? s : "/dashboard";
 }
 
-/** Robustly detect Next.js redirect errors thrown by `redirect()` */
+/** Detect Next.js redirect() thrown value so we rethrow it properly. */
 function isNextRedirectError(err: unknown): boolean {
   if (!err) return false;
   if (typeof err === "string") return err.includes("NEXT_REDIRECT");
@@ -24,6 +24,11 @@ function isNextRedirectError(err: unknown): boolean {
   return digest.includes("NEXT_REDIRECT") || message.includes("NEXT_REDIRECT");
 }
 
+/**
+ * EMAIL + PASSWORD SIGN-IN
+ * Runs on the server, sets HTTP-only Supabase cookies, then redirects.
+ * This makes the server-rendered Navbar see the session immediately (no manual refresh).
+ */
 export async function signInWithPassword(
   _prev: unknown,
   formData: FormData
@@ -33,11 +38,18 @@ export async function signInWithPassword(
     const password = String(formData.get("password") || "");
     const nextRaw = String(formData.get("next") || "");
 
+    if (!email || !password) return { ok: false, error: "Email and password are required." };
+
     const supabase = await supabaseServer();
 
+    // Sign in on the SERVER so Supabase writes auth cookies to the server response
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { ok: false, error: error.message };
 
+    // Touch session to ensure cookie write before redirect (harmless if already set)
+    await supabase.auth.getSession();
+
+    // Optional gating by onboarding/approval
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -50,16 +62,20 @@ export async function signInWithPassword(
       .maybeSingle();
 
     if (!profile || !profile.onboarded) {
-      redirect("/onboarding"); // throws -> must not be swallowed
+      redirect("/onboarding"); // throws -> do not swallow
     }
 
     redirect(preferDashboard(nextRaw)); // throws
-  } catch (e: unknown) {
-    if (isNextRedirectError(e)) throw e; // let Next complete the navigation
+  } catch (e) {
+    if (isNextRedirectError(e)) throw e;
     return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
   }
 }
 
+/**
+ * EMAIL + PASSWORD SIGN-UP
+ * Also runs on the server; if your project requires email confirm, there may be no session yet.
+ */
 export async function signUpWithPassword(
   _prev: unknown,
   formData: FormData
@@ -68,25 +84,35 @@ export async function signUpWithPassword(
     const email = String(formData.get("email") || "").trim();
     const password = String(formData.get("password") || "");
 
+    if (!email || !password) return { ok: false, error: "Email and password are required." };
+
     const supabase = await supabaseServer();
 
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { ok: false, error: error.message };
 
-    redirect("/onboarding"); // throws
-  } catch (e: unknown) {
-    if (isNextRedirectError(e)) throw e; // do not swallow redirect
+    // If email confirmation is required, there won't be a session yet
+    if (!data.session) redirect("/auth/verify-email");
+
+    // Otherwise, proceed to onboarding
+    redirect("/onboarding");
+  } catch (e) {
+    if (isNextRedirectError(e)) throw e;
     return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
   }
 }
 
+/**
+ * GOOGLE OAUTH START
+ * Builds a proper origin and sends user to /auth/callback (which sets cookies server-side).
+ */
 export async function signInWithGoogle(
   _prev: unknown,
   formData: FormData
 ): Promise<ActionResult> {
   try {
-    // Build origin that works locally / on Vercel
-    const h = await headers(); // not async
+    // In your environment headers() returns a Promise — await it.
+    const h = await headers();
     const host = h.get("x-forwarded-host") || h.get("host") || "localhost:3000";
     const proto = h.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
     const origin = `${proto}://${host}`;
@@ -95,7 +121,6 @@ export async function signInWithGoogle(
     const next = preferDashboard(nextRaw);
 
     const supabase = await supabaseServer();
-
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -108,7 +133,7 @@ export async function signInWithGoogle(
     if (!data?.url) return { ok: false, error: "No redirect URL returned" };
 
     return { ok: true, url: data.url };
-  } catch (e: unknown) {
+  } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
   }
 }

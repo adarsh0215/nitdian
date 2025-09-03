@@ -3,6 +3,7 @@ import OnboardingForm from "@/components/onboarding/OnboardingForm";
 import { redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
 
+
 export const metadata = { title: "Onboarding" };
 export const dynamic = "force-dynamic";
 

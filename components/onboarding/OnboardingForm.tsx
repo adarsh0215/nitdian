@@ -12,6 +12,7 @@ import {
   BRANCHES,
   EMPLOYMENT_TYPES,
   COUNTRIES,
+  GENDERS,
 } from "@/lib/validation/onboarding";
 import { saveOnboarding } from "@/actions/profile";
 
@@ -19,6 +20,7 @@ import { saveOnboarding } from "@/actions/profile";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
 
 /* Local small components */
 import Field from "./fields/Field";
@@ -28,6 +30,7 @@ import SelectEnumField from "./fields/SelectEnumField";
 import InterestsGrid from "./fields/InterestsGrid";
 import DirectoryConsents from "./fields/DirectoryConsents";
 import TermsCheckbox from "./fields/TermsCheckbox";
+import SelectYearField from "./fields/SelectYearField";
 
 type Result = { ok: false; error: string } | null;
 
@@ -55,7 +58,8 @@ export default function OnboardingForm({
   const onSubmit = form.handleSubmit((values) => {
     const fd = new FormData();
     Object.entries(values).forEach(([k, v]) => {
-      if (k === "interests" && Array.isArray(v)) v.forEach((i) => fd.append("interests", String(i)));
+      if (k === "interests" && Array.isArray(v))
+        v.forEach((i) => fd.append("interests", String(i)));
       else if (typeof v === "boolean") fd.set(k, v ? "true" : "false");
       else if (v != null) fd.set(k, String(v));
     });
@@ -70,6 +74,7 @@ export default function OnboardingForm({
   const idRoll = React.useId();
   const idCompany = React.useId();
   const idDesignation = React.useId();
+  const idGender = React.useId();
 
   const errors = form.formState.errors;
 
@@ -78,8 +83,8 @@ export default function OnboardingForm({
       <CardHeader>
         <CardTitle>Complete your profile</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-            Fill your details to help alumni connect with you.
-          </p>
+          Fill your details to help alumni connect with you.
+        </p>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-8" noValidate>
@@ -87,38 +92,57 @@ export default function OnboardingForm({
 
           {/* Basic info */}
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field
-              label="Full name ( As it appears in college records )"
-              htmlFor={idFullName}
-              required
-              error={errors.full_name?.message}
-            >
-              <Input
-                id={idFullName}
-                {...form.register("full_name")}
-                placeholder="Your full name"
-                autoComplete="name"
-                aria-required="true"
-                aria-invalid={!!errors.full_name}
-              />
-            </Field>
+            {/* 1) Email — full-width row */}
+            <div className="sm:col-span-2">
+              <Field label="Email" htmlFor={idEmail} required>
+                <Input
+                  id={idEmail}
+                  {...form.register("email")}
+                  type="email"
+                  readOnly
+                  disabled
+                  autoComplete="email"
+                  aria-required="true"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Email is tied to your account and can’t be changed here.
+                </p>
+              </Field>
+            </div>
 
-            <Field label="Email" htmlFor={idEmail} required>
-              <Input
-                id={idEmail}
-                {...form.register("email")}
-                type="email"
-                readOnly
-                disabled
-                autoComplete="email"
-                aria-required="true"
-              />
-              <p className="text-xs text-muted-foreground">
-                Email is tied to your account and can’t be changed here.
-              </p>
-            </Field>
+            {/* 2) Gender (small) + Full name (wide) in one row on sm+ */}
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <SelectEnumField
+                  control={form.control}
+                  name="gender"
+                  label="Gender"
+                  options={GENDERS as unknown as string[]}
+                  placeholder="Select gender"
+                  id={idGender}
+                  error={undefined}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <Field
+                  label="Full name ( As it appears in college records )"
+                  htmlFor={idFullName}
+                  required
+                  error={errors.full_name?.message}
+                >
+                  <Input
+                    id={idFullName}
+                    {...form.register("full_name")}
+                    placeholder="Your full name"
+                    autoComplete="name"
+                    aria-required="true"
+                    aria-invalid={!!errors.full_name}
+                  />
+                </Field>
+              </div>
+            </div>
 
-            {/* Phone */}
+            {/* 3) Phone — unchanged (full row inside its component) */}
             <PhoneE164Field
               control={form.control}
               error={errors.phone_e164?.message as string | undefined}
@@ -146,24 +170,12 @@ export default function OnboardingForm({
               error={undefined}
             />
 
-            <Field
-              label="Graduation year"
-              htmlFor={idGradYear}
+            <SelectYearField
+              control={form.control}
+              id={idGradYear}
               required
               error={errors.graduation_year?.message as string | undefined}
-            >
-              <Input
-                id={idGradYear}
-                {...form.register("graduation_year", {
-                  setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)),
-                })}
-                inputMode="numeric"
-                placeholder="2016"
-                aria-required="true"
-                aria-invalid={!!errors.graduation_year}
-              />
-            </Field>
-
+            />
             <SelectEnumField
               control={form.control}
               name="degree"
@@ -184,8 +196,12 @@ export default function OnboardingForm({
               error={errors.branch?.message as string | undefined}
             />
 
-            <Field label="Roll number ( at REC/NIT Durgapur )" htmlFor={idRoll}>
-              <Input id={idRoll} {...form.register("roll_number")} placeholder="(optional)" />
+            <Field label="Roll Number ( at REC/NIT Durgapur )" htmlFor={idRoll}>
+              <Input
+                id={idRoll}
+                {...form.register("roll_number")}
+                placeholder="(Valid Roll Number)"
+              />
             </Field>
 
             <SelectEnumField
