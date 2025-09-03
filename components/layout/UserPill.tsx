@@ -1,3 +1,4 @@
+// components/layout/UserPill.tsx
 "use client";
 
 import * as React from "react";
@@ -49,12 +50,26 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
     setOpen(false);
     try {
       const supabase = supabaseBrowser();
+
+      // 1) Clear local client session immediately so UI flips
+      await supabase.auth.signOut({ scope: "local" });
+
+      // 2) Clear server cookies (and optionally revoke tokens)
       await Promise.allSettled([
+        // revoke tokens across devices if you want (safe to keep or remove)
         supabase.auth.signOut({ scope: "global" }),
-        fetch("/auth/callback/signout", { method: "POST", credentials: "include" }),
+        fetch("/auth/callback/signout", {
+          method: "POST",
+          credentials: "include",
+          cache: "no-store",
+        }),
       ]);
-      router.replace("/login");
-      router.refresh();
+
+      // 3) HARD redirect to avoid App Router/RSC caching quirks
+      window.location.replace("/login");
+      // (router.replace + refresh can be flaky here; hard nav is rock solid)
+    } catch {
+      window.location.replace("/login");
     } finally {
       setSigningOut(false);
     }
