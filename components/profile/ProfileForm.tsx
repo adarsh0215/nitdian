@@ -6,11 +6,11 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   OnboardingSchema,
+  type OnboardingValues,
   DEGREES,
   BRANCHES,
   EMPLOYMENT_TYPES,
   COUNTRIES,
-  type OnboardingValues,
 } from "@/lib/validation/onboarding";
 import { saveProfile } from "@/actions/profile";
 
@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-/* Reuse onboarding fields (typed to OnboardingValues) */
+/* Reuse your existing field components */
 import Field from "@/components/onboarding/fields/Field";
 import AvatarField from "@/components/onboarding/fields/AvatarField";
 import PhoneE164Field from "@/components/onboarding/fields/PhoneE164Field";
@@ -27,50 +27,65 @@ import SelectEnumField from "@/components/onboarding/fields/SelectEnumField";
 import InterestsGrid from "@/components/onboarding/fields/InterestsGrid";
 import DirectoryConsents from "@/components/onboarding/fields/DirectoryConsents";
 
-type Result = { ok: false; error: string } | { ok: true } | null;
-
-// ⚠️ Important: keep the RHF value type = OnboardingValues
-// so all reused field components' Control<> types match.
-type FormValues = OnboardingValues;
+type Result = { ok: false; error: string } | null;
 
 export default function ProfileForm({
   userId,
   defaults,
 }: {
   userId: string;
-  defaults: FormValues; // defaults must include consent_terms_privacy: true
+  defaults: OnboardingValues;
 }) {
-  const resolver = zodResolver(OnboardingSchema) as unknown as Resolver<FormValues>;
+  // Keep schema identical to onboarding so all shared fields accept this control.
+  const resolver = zodResolver(OnboardingSchema) as Resolver<OnboardingValues>;
 
-  const form = useForm<FormValues>({
+  const form = useForm<OnboardingValues>({
     resolver,
     defaultValues: defaults,
     mode: "onBlur",
   });
 
   const [state, formAction] = React.useActionState<Result, FormData>(
-    async (_prev, formData) => saveProfile(formData),
+    async (_prev, fd) => saveProfile(null, fd),
     null
   );
   const [isPending, startTransition] = React.useTransition();
 
+  // After a successful save (state === null), notify Navbar to refresh UserPill.
+  React.useEffect(() => {
+    if (state === null) {
+      const values = form.getValues();
+      const detail = {
+        name: values.full_name,
+        email: values.email,
+        avatarUrl: values.avatar_url ?? null,
+      };
+      window.dispatchEvent(new CustomEvent("profile:updated", { detail }));
+    }
+  }, [state, form]);
+
   const onSubmit = form.handleSubmit((values) => {
     const fd = new FormData();
     Object.entries(values).forEach(([k, v]) => {
-      if (k === "interests" && Array.isArray(v)) v.forEach((i) => fd.append("interests", String(i)));
-      else if (typeof v === "boolean") fd.set(k, v ? "true" : "false");
-      else if (v != null) fd.set(k, String(v));
+      if (k === "interests" && Array.isArray(v)) {
+        v.forEach((i) => fd.append("interests", String(i)));
+      } else if (typeof v === "boolean") {
+        fd.set(k, v ? "true" : "false");
+      } else if (v != null) {
+        fd.set(k, String(v));
+      }
     });
 
-    // We don't want the profile save to care about this field:
-    fd.delete("consent_terms_privacy");
+    // Not shown on Profile page, but the schema includes it; keep it true.
+    if (!fd.has("consent_terms_privacy")) fd.set("consent_terms_privacy", "true");
 
+    // Dispatch the server action; do NOT check the (void) return of formAction.
     startTransition(() => formAction(fd));
   });
 
   const errors = form.formState.errors;
 
-  // ids for inputs
+  // ids for simple text inputs
   const idFullName = React.useId();
   const idEmail = React.useId();
   const idCity = React.useId();
@@ -82,11 +97,12 @@ export default function ProfileForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Profile</CardTitle>
+        <CardTitle>Edit profile</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Update your details. Changes appear in the directory if you’ve consented.
+          Keep your information up to date so other alumni can connect with you.
         </p>
       </CardHeader>
+
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-8" noValidate>
           <AvatarField control={form.control} userId={userId} />
@@ -94,10 +110,10 @@ export default function ProfileForm({
           {/* Basic info */}
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field
-              label="Full name"
+              label="Full name ( As it appears in college records )"
               htmlFor={idFullName}
               required
-              error={errors.full_name?.message as string | undefined}
+              error={errors.full_name?.message}
             >
               <Input
                 id={idFullName}
@@ -190,7 +206,7 @@ export default function ProfileForm({
               error={errors.branch?.message as string | undefined}
             />
 
-            <Field label="Roll number" htmlFor={idRoll}>
+            <Field label="Roll number ( at REC/NIT Durgapur )" htmlFor={idRoll}>
               <Input id={idRoll} {...form.register("roll_number")} placeholder="(optional)" />
             </Field>
 
@@ -227,13 +243,10 @@ export default function ProfileForm({
             error={errors.interests?.message as string | undefined}
           />
 
-          {/* Directory visibility consents */}
           <DirectoryConsents control={form.control} />
 
-          {/* No Terms checkbox on Profile page */}
-
           {/* Action */}
-          {state && "ok" in state && !state.ok && (
+          {state?.error && (
             <p className="text-sm text-red-600" role="alert">
               {state.error}
             </p>

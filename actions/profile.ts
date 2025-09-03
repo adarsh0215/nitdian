@@ -1,90 +1,127 @@
 // actions/profile.ts
 "use server";
 
-import { z } from "zod";
-import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { OnboardingSchema } from "@/lib/validation/onboarding";
 
-// Profile = Onboarding minus terms checkbox
-const ProfileSchema = OnboardingSchema.omit({ consent_terms_privacy: true });
+type Result = { ok: false; error: string } | null;
 
-function fdToObject(fd: FormData) {
-  const obj: Record<string, unknown> = {};
-  for (const [k, v] of fd.entries()) {
-    if (k === "interests") {
-      if (!Array.isArray(obj.interests)) obj.interests = [];
-      (obj.interests as unknown[]).push(v);
-    } else {
-      obj[k] = v;
-    }
+/* ------------------------- shared helpers ------------------------- */
+
+function parseFromForm(formData: FormData):
+  | { values: ReturnType<typeof OnboardingSchema.parse> }
+  | { error: string } {
+  const raw = Object.fromEntries(formData.entries());
+
+  const picks = {
+    full_name: String(raw.full_name || ""),
+    email: String(raw.email || ""),
+    phone_e164: String(raw.phone_e164 || ""),
+    city: String(raw.city || ""),
+    country: String(raw.country || ""),
+    graduation_year: String(raw.graduation_year || ""),
+    degree: raw.degree ? String(raw.degree) : undefined,
+    branch: raw.branch ? String(raw.branch) : undefined,
+    roll_number: String(raw.roll_number || ""),
+    employment_type: raw.employment_type ? String(raw.employment_type) : undefined,
+    company: String(raw.company || ""),
+    designation: String(raw.designation || ""),
+    avatar_url: String(raw.avatar_url || ""),
+    interests:
+      formData.getAll("interests")?.map(String) ??
+      (raw.interests ? String(raw.interests).split(",").map((s) => s.trim()) : []),
+    consent_terms_privacy:
+      formData.get("consent_terms_privacy") === "on" ||
+      String(raw.consent_terms_privacy) === "true",
+    consent_directory_visible:
+      formData.get("consent_directory_visible") === "on" ||
+      String(raw.consent_directory_visible) === "true",
+    consent_directory_show_contacts:
+      formData.get("consent_directory_show_contacts") === "on" ||
+      String(raw.consent_directory_show_contacts) === "true",
+  };
+
+  const parsed = OnboardingSchema.safeParse(picks);
+  if (!parsed.success) {
+    const msg = parsed.error.issues[0]?.message ?? "Invalid input";
+    return { error: msg };
   }
-  return obj;
+  return { values: parsed.data };
 }
 
-export async function saveProfile(formData: FormData) {
+async function upsertProfileBase(opts: {
+  values: ReturnType<typeof OnboardingSchema.parse>;
+  setOnboarded?: boolean;
+}): Promise<Result> {
   const supabase = await supabaseServer();
 
-  // Must be signed in
   const {
     data: { user },
-    error: authError,
+    error: userErr,
   } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return { ok: false as const, error: "Not authenticated." };
-  }
+  if (userErr || !user) return { ok: false, error: "Not authenticated." };
 
-  // Parse + coerce
-  const raw = fdToObject(formData);
+  const v = opts.values;
 
-  if (raw.interests) {
-    raw.interests = (Array.isArray(raw.interests) ? raw.interests : [raw.interests])
-      .map((x) => Number(x))
-      .filter((n) => Number.isFinite(n));
-  }
-  if (raw.graduation_year === "" || raw.graduation_year == null) {
-    raw.graduation_year = undefined;
-  } else {
-    raw.graduation_year = Number(raw.graduation_year);
-  }
+  // Keep the payload shape simple & permissive for TS
+  const upsert: Record<string, any> = {
+    id: user.id,
+    email: v.email,
+    full_name: v.full_name,
+    phone_e164: v.phone_e164 || null,
+    city: v.city || null,
+    country: v.country || null,
+    graduation_year: v.graduation_year ?? null,
+    degree: v.degree ?? null,
+    branch: v.branch ?? null,
+    roll_number: v.roll_number || null,
+    employment_type: v.employment_type ?? null,
+    company: v.company || null,
+    designation: v.designation || null,
+    avatar_url: v.avatar_url || null,
+    interests: v.interests && v.interests.length ? v.interests : [],
+    consent_terms_privacy: v.consent_terms_privacy,
+    consent_directory_visible: v.consent_directory_visible,
+    consent_directory_show_contacts: v.consent_directory_show_contacts,
+  };
 
-  let parsed: z.infer<typeof ProfileSchema>;
-  try {
-    parsed = ProfileSchema.parse(raw);
-  } catch (e) {
-    const msg = e instanceof z.ZodError ? e.issues?.[0]?.message ?? "Invalid input." : "Invalid input.";
-    return { ok: false as const, error: msg };
-  }
+  if (opts.setOnboarded) upsert.onboarded = true;
 
-  // Persist
-  const { error: upErr } = await supabase
+  const { error: upsertErr } = await supabase
     .from("profiles")
-    .update({
-      full_name: parsed.full_name,
-      email: parsed.email,
-      phone_e164: parsed.phone_e164 ?? null,
-      city: parsed.city ?? null,
-      country: parsed.country ?? null,
-      graduation_year: parsed.graduation_year ?? null,
-      degree: parsed.degree ?? null,
-      branch: parsed.branch ?? null,
-      roll_number: parsed.roll_number ?? null,
-      employment_type: parsed.employment_type ?? null,
-      company: parsed.company ?? null,
-      designation: parsed.designation ?? null,
-      interests: parsed.interests ?? [],
-      consent_directory_visible: parsed.consent_directory_visible ?? false,
-      consent_directory_show_contacts: parsed.consent_directory_show_contacts ?? false,
-    })
-    .eq("id", user.id);
+    .upsert(upsert, { onConflict: "id" });
 
-  if (upErr) {
-    return { ok: false as const, error: "Could not save profile. Please try again." };
+  if (upsertErr) return { ok: false, error: upsertErr.message };
+
+  // Simpler: just set the timestamp (avoid `.is(..., null)` typing hassles)
+  if (v.consent_terms_privacy) {
+    await supabase
+      .from("profiles")
+      .update({ accepted_terms_at: new Date().toISOString() })
+      .eq("id", user.id);
   }
 
-  // Revalidate pages that depend on profile
-  revalidatePath("/profile");
-  revalidatePath("/directory");
+  return null;
+}
 
-  return { ok: true as const };
+/* ------------------------- actions ------------------------- */
+
+// Keep your onboarding behavior (redirect after save)
+export async function saveOnboarding(_prev: Result, formData: FormData): Promise<Result> {
+  const parsed = parseFromForm(formData);
+  if ("error" in parsed) return { ok: false, error: parsed.error };
+
+  const result = await upsertProfileBase({ values: parsed.values, setOnboarded: true });
+  if (result) return result;
+
+  redirect("/dashboard");
+}
+
+// New action for Profile page (no redirect)
+export async function saveProfile(_prev: Result, formData: FormData): Promise<Result> {
+  const parsed = parseFromForm(formData);
+  if ("error" in parsed) return { ok: false, error: parsed.error };
+
+  return upsertProfileBase({ values: parsed.values, setOnboarded: false });
 }
