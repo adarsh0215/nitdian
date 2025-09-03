@@ -119,9 +119,16 @@ export async function saveOnboarding(_prev: Result, formData: FormData): Promise
 }
 
 // New action for Profile page (no redirect)
+// actions/profile.ts (only the saveProfile export shown)
+
 export async function saveProfile(_prev: Result, formData: FormData): Promise<Result> {
   const parsed = parseFromForm(formData);
   if ("error" in parsed) return { ok: false, error: parsed.error };
 
-  return upsertProfileBase({ values: parsed.values, setOnboarded: false });
+  const result = await upsertProfileBase({ values: parsed.values, setOnboarded: false });
+  if (result) return result; // show validation/db error on the form
+
+  // ✅ redirect after successful update
+  redirect("/dashboard");
 }
+
