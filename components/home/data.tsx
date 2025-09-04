@@ -34,8 +34,8 @@ export const HOMEPAGE_DATA = {
   hero: {
     headline: "Connect. Collaborate.  Contribute.",
     subtext: "The official NIT Durgapur International Alumni Network.",
-    primary: { label: "Join the Network", href: "/auth/signup" } satisfies Cta,
-    secondary: { label: "Sign In", href: "/auth/login" } satisfies Cta,
+    primary: { label: "Join the Network", href: "/signup" } satisfies Cta,
+    secondary: { label: "Sign In", href: "/login" } satisfies Cta,
     microProof: "2,143 alumni and growing",
   },
 
@@ -343,7 +343,7 @@ export const HOMEPAGE_DATA = {
   joinSection: {
     headline: "Be part of the alumni advantage.",
     subheading: "Unlock memories, opportunities, and community.",
-    cta: { label: "Join the Network", href: "/auth/signup" } satisfies Cta,
+    cta: { label: "Join the Network", href: "/signup" } satisfies Cta,
   },
 
   footer: {
@@ -356,7 +356,7 @@ export const HOMEPAGE_DATA = {
      
     ] satisfies FooterLink[],
     socials: [
-      { label: "Contact us", href: "/" },
+      { label: "Contact us", href: "mailto:nitdiandelhi@gmail.com" },
     ] satisfies FooterLink[],
     note: "© 2025 NIT Durgapur International Alumni Network.",
   },
