@@ -3,7 +3,7 @@ import  Link  from "next/link";
 import { useEffect, useState } from "react";
 
 
-function ComingSoon() {
+export default function ComingSoon() {
   const endTime = process.env.NEXT_PUBLIC_COMING_SOON_UNTIL!;
   const launchTime = new Date(endTime).getTime();
   const calculateTimeLeft = () => Math.max(launchTime - Date.now(), 0);
@@ -63,6 +63,6 @@ function ComingSoon() {
   );
 }
 
-(ComingSoon as any).hideLayout = true;
+// (ComingSoon as unknown).hideLayout = true;
 
-export default ComingSoon;
+// export default ComingSoon;

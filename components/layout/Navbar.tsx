@@ -41,9 +41,7 @@ function isProfileRow(v: unknown): v is ProfileRow { return !!v && typeof v === 
 
 export default function Navbar({ initialPill = null }: { initialPill?: UserPillData | null }) {
   const pathname = usePathname();
-  if (pathname === "/coming-soon" ) {
-    return null
-  };
+  
   const router = useRouter();
   const supabase = React.useMemo(() => supabaseBrowser(), []);
 
@@ -86,6 +84,7 @@ export default function Navbar({ initialPill = null }: { initialPill?: UserPillD
       void hydrateFromProfile(user.id);
     }
   }, [pillFromUser, hydrateFromProfile]);
+
 
   React.useEffect(() => {
     let cancelled = false;
@@ -182,6 +181,8 @@ export default function Navbar({ initialPill = null }: { initialPill?: UserPillD
     };
     document.addEventListener("visibilitychange", onVis);
 
+    
+
     return () => {
       cancelled = true;
       clearTimeout(fallback);
@@ -191,6 +192,11 @@ export default function Navbar({ initialPill = null }: { initialPill?: UserPillD
       if (profileChannel) supabase.removeChannel(profileChannel);
     };
   }, [supabase, pillFromUser, setFromSession, hydrateFromProfile, router]);
+
+  
+  if (pathname === "/coming-soon" ) {
+    return null
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
