@@ -87,7 +87,7 @@ export default function BrandStrip({
                   <li role="listitem" key={`${b.name}-${i}`} className="shrink-0">
                     {src ? (
                       <Wrap>
-                        <div className="relative h-10 sm:h-12 md:h-14 w-[110px] sm:w-[130px] md:w-[140px]">
+                        <div className="relative h-12 sm:h-14 md:h-16 w-[110px] sm:w-[130px] md:w-[50px]">
                           <Image
                             src={src}
                             alt={b.name}

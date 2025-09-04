@@ -33,7 +33,7 @@ export default function ImageTicker() {
         transition={{
           repeat: Infinity,
           ease: "linear",
-          duration: 40, // speed of the ticker
+          duration: 8, // speed of the ticker
         }}
       >
         {tickerImages.map((img) => (
