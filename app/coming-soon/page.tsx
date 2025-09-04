@@ -40,7 +40,7 @@ export default function ComingSoon() {
           Launching Today
         </h2>
         <h1 className="text-4xl md:text-5xl font-semibold mb-6">
-         6:00 PM, 4th September
+         5:00 PM, 4th September
         </h1>
         <h3 className="text-2xl  font-semibold mb-6">
           Join us at PSOI Club, Chanakyapuri, New Delhi

@@ -88,7 +88,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/coming-soon", req.url));
   }
 
-  return NextResponse.next();
+  // return NextResponse.next();
   
 
 
