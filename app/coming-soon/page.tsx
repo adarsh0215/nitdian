@@ -1,17 +1,13 @@
 "use client"
-import { Link } from "lucide-react";
+import  Link  from "next/link";
 import { useEffect, useState } from "react";
 
 
-export default function ComingSoon() {
+function ComingSoon() {
   const endTime = process.env.NEXT_PUBLIC_COMING_SOON_UNTIL!;
   const launchTime = new Date(endTime).getTime();
   const calculateTimeLeft = () => Math.max(launchTime - Date.now(), 0);
   const [timeLeft, setTimeLeft] = useState(launchTime - Date.now());
-  
-
-
-  
 
   useEffect(() => {
     if (timeLeft <= 0) return; // stop updating if already reached 0
@@ -51,12 +47,12 @@ export default function ComingSoon() {
 
         {timeLeft <= 0 && (
           <p>
-              <a
+              <Link
             href="/"
             className="text-xl md:text-2xl font-semibold text-blue-400 underline hover:text-blue-300"
           >
             🎉 We are live! Click here to continue →
-          </a>
+          </Link>
           </p>
 
           
@@ -66,3 +62,7 @@ export default function ComingSoon() {
     </div>
   );
 }
+
+(ComingSoon as any).hideLayout = true;
+
+export default ComingSoon;

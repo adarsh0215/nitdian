@@ -41,6 +41,9 @@ function isProfileRow(v: unknown): v is ProfileRow { return !!v && typeof v === 
 
 export default function Navbar({ initialPill = null }: { initialPill?: UserPillData | null }) {
   const pathname = usePathname();
+  if (pathname === "/coming-soon" ) {
+    return null
+  };
   const router = useRouter();
   const supabase = React.useMemo(() => supabaseBrowser(), []);
 

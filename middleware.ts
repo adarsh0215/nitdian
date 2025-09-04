@@ -85,7 +85,7 @@ export async function middleware(req: NextRequest) {
 
   // If before launch, send users to coming-soon page
   if (now < launchTime && !req.nextUrl.pathname.startsWith("/coming-soon")) {
-    return NextResponse.rewrite(new URL("/coming-soon", req.url));
+    return NextResponse.redirect(new URL("/coming-soon", req.url));
   }
 
   return NextResponse.next();
