@@ -1,4 +1,5 @@
 "use client"
+import { Link } from "lucide-react";
 import { useEffect, useState } from "react";
 
 
@@ -49,12 +50,17 @@ export default function ComingSoon() {
         </div>
 
         {timeLeft <= 0 && (
-          <a
+          <p>
+              <a
             href="/"
             className="text-xl md:text-2xl font-semibold text-blue-400 underline hover:text-blue-300"
           >
             🎉 We are live! Click here to continue →
           </a>
+          </p>
+
+          
+          
         )}
       </div>
     </div>
