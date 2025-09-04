@@ -30,16 +30,21 @@ export default function ComingSoon() {
 
   return (
     <div
-      className="w-screen h-screen flex items-center justify-center bg-cover bg-center text-white"
+      className="w-screen h-screen flex items-center justify-center bg-cover bg-center text-white "
       style={{
-        backgroundImage:
-          "url('https://images.unsplash.com/photo-1522199710521-72d69614c702?auto=format&fit=crop&w=1920&q=80')",
+        backgroundImage: "url('/images/nitdgate.jpeg')"
       }}
     >
-      <div className="bg-black bg-opacity-60 p-10 rounded-2xl text-center">
-        <h1 className="text-4xl md:text-6xl font-bold mb-6">
-          Launching at 6:00 PM, 4th September
+      <div className="bg-gray-500 bg-opacity-10 p-10 rounded-2xl text-center translate-y-10">
+        <h2 className="text-3xl  font-semibold mb-6">
+          Launching Today
+        </h2>
+        <h1 className="text-4xl md:text-5xl font-semibold mb-6">
+         6:00 PM, 4th September
         </h1>
+        <h3 className="text-2xl  font-semibold mb-6">
+          Join us at PSOI Club, Chanakyapuri, New Delhi
+        </h3>
 
         <div className="text-5xl md:text-7xl font-mono mb-6">
           {formatTime(timeLeft)}
