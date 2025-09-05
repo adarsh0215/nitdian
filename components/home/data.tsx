@@ -192,7 +192,7 @@ export const HOMEPAGE_DATA = {
         quote:
           "Dear NITDians, NITDIAN Delhi is proud and committed to facilitate a lifetime connection among its alumni members and with our Alma Mater NIT Durgapur and our fraternity across the globe.\n\nThe indelible message of the Nobel Laureate great Rabindranath Tagore - \"Jôdi Tor Dak Shune Keu Naaa...Ase, Tôbe Ekla Chôlo Re\", speaks aloud that nobody can deter you in your determination and daringness if you are out to do selfless service.\n\nI would like to validate that interaction with your fellow alumni and batchmates leads you intrinsically to the best possible opportunity available at every stage of your career. Not only the sharing by seniors helps the junior alumni a lot, the noticeable achievements of the juniors also stimulate seniors in analysing and planning their activities in this lifelong journey.\n\nIt is an honor to connect with each one of you. I seek your support and engagement to take our society forward. Let us stay involved to grow and evolve together.",
         author: "Sandeep Kapoor",
-        role: "President, NITDian Delhi",
+        role: "President,\nNIT Durgapur International Alumni Network (NITDIAN)",
         avatar: "/members/sandeepkapoor.jpg",
         href: "/stories/arvind-choubey",
       },
