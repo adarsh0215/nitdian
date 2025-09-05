@@ -200,10 +200,10 @@ export default function Navbar({ initialPill = null }: { initialPill?: UserPillD
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link href="/" aria-label="NIT Durgapur" className="flex items-center gap-2 md:justify-self-start">
-          <Image src="/images/logo.svg" alt="Logo" width={40} height={40} className="h-10 w-10 object-contain rounded-lg hairline bg-surface" />
+          <Image src="/images/logo.svg" alt="Logo" width={48} height={48} className="h-14 w-14 object-contain  hairline bg-surface" />
           <div className="hidden sm:flex flex-col leading-tight min-w-0">
             <span className="truncate text-base font-semibold tracking-tight">NIT Durgapur</span>
             <span className="truncate text-xs sm:text-sm text-muted-foreground">International Alumni Network</span>
