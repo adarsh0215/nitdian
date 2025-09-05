@@ -200,7 +200,7 @@ export const HOMEPAGE_DATA = {
         quote: 
           "My Dear Sandeep, It gives me great joy to convey my heartfelt congratulations to you and the entire Delhi Chapter team on the launch of the NITDIAN Delhi Chapter website. \n\n This is a wonderful initiative that will not only keep our alumni associations connected but also open new avenues for collaboration, networking, and friendship among all NITD Alumni in Delhi and beyond. \n\n The Delhi Chapter has always been one of the most energetic and active arms of our alumni family, and this step will surely help carry forward that spirit in a meaningful way. I am excited to see how this platform will bring together experiences, opportunities, and memories, making our community stronger. \n\n Wishing our Associate unit NITDIAN, Delhi Chapter every success in this journey, and looking forward to celebrating many more such milestones together.",
         author: "Tarun Kumar Dutta",
-        role: "President, NITDAA - West Bengal",
+        role: "President, NITDAA",
         avatar: "/members/nitdaa.png",
         href: "/stories/sandeep-kapoor",
       },
@@ -214,7 +214,7 @@ export const HOMEPAGE_DATA = {
     {
       quote:
         "Dear NIT Durgapur Alumni, I'm thrilled to see our newly launched website! I believe this platform will strengthen our professional networks and also foster meaningful bonds among our fraternity, better halves, and children. Let's reconnect, share experiences, mentor and build a supportive community.  Together, let's make our NITD family even more vibrant and connected.",
-      author: "Jaya Mzumder Sood",
+      author: "Jaya Mazumder Sood",
       role: "1994 Civil",
       year: "WSP",
       avatar: "",
@@ -229,7 +229,7 @@ export const HOMEPAGE_DATA = {
     },
     {
       quote:
-        "It is heartening to note that NIITDIAN Delhi Chapter Website is being launched. The NIITD Delhi Chapter was doing a fabulous job of carrying forward the Alumni activities including that of supporting the Alumni members. Now with this Website, it would add new dimension to those efforts and give opportunities for greater reach and deeper engagement...",
+        "It is heartening to note that NITDIAN Delhi Chapter Website is being launched. The NIITD Delhi Chapter was doing a fabulous job of carrying forward the Alumni activities including that of supporting the Alumni members. Now with this Website, it would add new dimension to those efforts and give opportunities for greater reach and deeper engagement...",
       author: "Ratan Kesh",
       role: "1993 Mechanical",
       year: "ED & COO, Bandhan Bank",
@@ -246,7 +246,7 @@ export const HOMEPAGE_DATA = {
     {
       quote:
         "...Every story shared, every event attended, and every connection made will strengthen the NITDIAN fabric in Delhi and beyond. We invite all alumni to register, participate, and co-create this journey with us… website is not just a digital presence — it’s a commitment to keeping the NITDIAN spirit alive, wherever we are...",
-      author: "Prasantha Saha",
+      author: "Prasanta Saha",
       role: "2014 Mechanical",
       year: "EY",
       avatar: "",
@@ -277,7 +277,7 @@ export const HOMEPAGE_DATA = {
     {
       quote:
         "58 years back, scores of wide eyed boys from different states converged to RECD to be exposed to the kaleidiscopic world of friends, fun, frolic and fear. Those were turbulent times. Still we managed to remain afloat and contribute to Nation building",
-      author: "Sudhir Adhicary",
+      author: "Subir Adhicary",
       role: "1967 Civil",
       year: "\u00A0",
       avatar: "",
