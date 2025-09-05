@@ -229,7 +229,7 @@ export const HOMEPAGE_DATA = {
     },
     {
       quote:
-        "It is heartening to note that NITDIAN Delhi Chapter Website is being launched. The NIITD Delhi Chapter was doing a fabulous job of carrying forward the Alumni activities including that of supporting the Alumni members. Now with this Website, it would add new dimension to those efforts and give opportunities for greater reach and deeper engagement...",
+        "It is heartening to note that NITDIAN Delhi Chapter Website is being launched. The NITD Delhi Chapter was doing a fabulous job of carrying forward the Alumni activities including that of supporting the Alumni members. Now with this Website, it would add new dimension to those efforts and give opportunities for greater reach and deeper engagement...",
       author: "Ratan Kesh",
       role: "1993 Mechanical",
       year: "ED & COO, Bandhan Bank",
