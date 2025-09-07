@@ -25,20 +25,9 @@ export default async function DashboardPage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  // Keep jobs fetch parallelized even if not rendered yet (rename to avoid lint error)
-  const jobsPromise = sb
-    .from("jobs")
-    .select(
-      "id, title, company, location, employment_type, experience_level, apply_url, has_alumni_referral, tags, created_at"
-    )
-    .eq("status", "published")
-    .order("has_alumni_referral", { ascending: false })
-    .order("created_at", { ascending: false })
-    // .limit(5);
 
-  const [{ data: profile }, { data: _jobs }] = await Promise.all([
-    profilePromise,
-    jobsPromise,
+  const [{ data: profile }] = await Promise.all([
+    profilePromise
   ]);
 
   if (!profile?.onboarded) redirect("/onboarding");
@@ -54,8 +43,8 @@ export default async function DashboardPage() {
 
   if (profile?.graduation_year != null)
     sQuery = sQuery.eq("graduation_year", profile.graduation_year);
-  if (profile?.branch) sQuery = sQuery.eq("branch", profile.branch);
-  if (profile?.degree) sQuery = sQuery.eq("degree", profile.degree);
+  // if (profile?.branch) sQuery = sQuery.eq("branch", profile.branch);
+  // if (profile?.degree) sQuery = sQuery.eq("degree", profile.degree);
 
   const { data: strictMatches } = await sQuery;
 
@@ -80,12 +69,12 @@ export default async function DashboardPage() {
     ).values()
   );
 
-  const essentialsMissing =
-    !profile?.full_name ||
-    !profile?.graduation_year ||
-    !profile?.degree ||
-    !profile?.branch ||
-    !(profile?.interests && profile.interests.length > 0);
+  // const essentialsMissing =
+  //   !profile?.full_name ||
+  //   !profile?.graduation_year ||
+  //   !profile?.degree ||
+  //   !profile?.branch ||
+  //   !(profile?.interests && profile.interests.length > 0);
 
   // Count total batchmates by year (exclude me; only approved & public)
   const { count: batchmateCount } = await sb
