@@ -68,8 +68,8 @@ export default async function DashboardPage() {
       .eq("is_public", true)
       .eq("is_approved", true)
       .neq("id", user.id) // 🚫 exclude me here too
-      .eq("graduation_year", profile?.graduation_year ?? -1)
-      .limit(6);
+      .eq("graduation_year", profile?.graduation_year ?? -1);
+    // .limit(6);
     suggestions = yearOnly ?? [];
   }
 
@@ -87,13 +87,21 @@ export default async function DashboardPage() {
     !profile?.branch ||
     !(profile?.interests && profile.interests.length > 0);
 
+  // Count total batchmates by year (exclude me; only approved & public)
+  const { count: batchmateCount } = await sb
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("is_public", true)
+    .eq("is_approved", true)
+    .neq("id", user.id)
+    .eq("graduation_year", profile?.graduation_year ?? -1);
+
   return (
     <main className="mx-auto max-w-6xl p-6 space-y-6">
       {!isApproved ? (
         <div className="rounded-xl border border-yellow-300/50 bg-yellow-50 text-yellow-900 p-3 text-sm flex items-center gap-2 dark:bg-yellow-950/30 dark:text-yellow-100">
           <AlertCircle className="h-4 w-4" />
-          Your profile is pending approval. 
-          You can still edit your Profile.
+          Your profile is pending approval. You can still edit your Profile.
           {/* {isAdmin ? (
             <span className="ml-auto text-xs opacity-80">
               (You’re admin—use Admin → Approvals)
@@ -112,23 +120,33 @@ export default async function DashboardPage() {
           {/* Main column */}
           <div className="space-y-4 lg:col-span-2">
             <Section
-              title="My Batchmates"
+              title={`My Batchmates${
+                typeof batchmateCount === "number" ? ` (${batchmateCount})` : ""
+              }`}
               cta={
                 <Button asChild size="sm" variant="outline">
-                  <Link href="/directory">Open directory</Link>
+                  <Link href="/directory">Open directory for Details</Link>
                 </Button>
               }
             >
               {cleanSuggestions.length > 0 ? (
-                <ul className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                <ul
+                  className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3"
+                  role="list"
+                >
                   {cleanSuggestions.map((p) => (
                     <li key={p.id}>
                       <SuggestionCard
+                        href="/directory"
                         name={p.full_name ?? "Alumni"}
                         avatar={p.avatar_url}
-                        meta={[p.branch, p.graduation_year, p.company]
-                          .filter(Boolean)
-                          .join(" • ")}
+                        /* pass rich fields instead of meta so the card formats them properly */
+                        branch={p.branch ?? undefined} // "Mechanical Engineering" → (cleaned to) "Mechanical"
+                        // designation={p.designation ?? undefined}  // optional
+                        company={p.company ?? undefined} // optional
+                        // city={p.city ?? undefined}                // optional
+                        // country={p.country ?? undefined}          // optional
+                        /* meta is now unnecessary (fallback only) */
                       />
                     </li>
                   ))}

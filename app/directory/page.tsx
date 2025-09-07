@@ -8,7 +8,11 @@ import { supabaseServer } from "@/lib/supabase/server";
 
 const PER_PAGE = 24;
 
-// helpers
+// -------------------------
+// Helpers: safe coercion
+// -------------------------
+// - `asString`: ensures query param is a string
+// - `asNumber`: ensures query param is a finite number
 function asString(v: string | string[] | undefined) {
   return typeof v === "string" ? v : undefined;
 }
@@ -19,6 +23,11 @@ function asNumber(v: string | string[] | undefined) {
   return Number.isFinite(n) ? n : undefined;
 }
 
+// -------------------------
+// Parse query params -> DirectoryFilters
+// -------------------------
+// Normalizes and defaults filter state for directory searches.
+// Ensures valid page number and fallback sort option.
 function parseFilters(
   sp: Record<string, string | string[] | undefined>
 ): DirectoryFilters {
@@ -34,10 +43,18 @@ function parseFilters(
   };
 }
 
+// -------------------------
+// DirectoryPage (Server Component)
+// -------------------------
+// Responsible for:
+// - reading filters from searchParams
+// - querying Supabase with those filters
+// - applying sorting + pagination
+// - returning initial data to the client component
 export default async function DirectoryPage({
   searchParams,
 }: {
-  // Next.js 15: searchParams is a Promise
+  // Next.js 15: searchParams is passed as a Promise
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
@@ -45,7 +62,10 @@ export default async function DirectoryPage({
 
   const supabase = await supabaseServer();
 
-  // base query
+  // -------------------------
+  // Base query:
+  // fetch only approved + public profiles
+  // -------------------------
   let q = supabase
     .from("profiles")
     .select(
@@ -55,37 +75,51 @@ export default async function DirectoryPage({
     .eq("is_public", true)
     .eq("is_approved", true);
 
-  // search / filters
+  // -------------------------
+  // Apply search term filter
+  // -------------------------
   if (filters.q) {
     const term = `%${filters.q}%`;
     q = q.or(
       `full_name.ilike.${term},company.ilike.${term},city.ilike.${term},branch.ilike.${term}`
     );
   }
+
+  // -------------------------
+  // Apply branch / degree / year filters
+  // -------------------------
   if (filters.branch) q = q.eq("branch", filters.branch);
   if (filters.degree) q = q.eq("degree", filters.degree);
   if (filters.year) q = q.eq("graduation_year", filters.year);
 
-  // sort
+  // -------------------------
+  // Sorting options
+  // -------------------------
   if (filters.sort === "name") q = q.order("full_name", { ascending: true });
   if (filters.sort === "recent") q = q.order("created_at", { ascending: false });
   if (filters.sort === "year_desc")
     q = q.order("graduation_year", { ascending: false });
 
-  // pagination
+  // -------------------------
+  // Pagination
+  // -------------------------
   const from = (filters.page - 1) * PER_PAGE;
   const to = from + PER_PAGE - 1;
   const { data, count, error } = await q.range(from, to);
+
   if (error) {
-    // Fail-soft: empty list if something goes wrong
+    // Fail-soft: return empty list to avoid breaking UI
     console.error("Directory initial fetch failed:", error.message);
   }
 
+  // -------------------------
+  // Build initial client payload
+  // -------------------------
   const initial: DirectoryInitial = {
     items: (data ?? []) as DirectoryItem[],
     total: count ?? 0,
     perPage: PER_PAGE,
-    filters, // <-- 'page' lives inside here
+    filters, // includes current page and filter state
   };
 
   return <DirectoryClient initial={initial} />;

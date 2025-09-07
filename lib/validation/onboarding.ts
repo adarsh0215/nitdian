@@ -246,7 +246,7 @@ export function toFormDefaults(email?: string): OnboardingValues {
 
     phone_e164: "", // required -> start empty
     city: "",
-    country: "",
+    country: "India",
     graduation_year: undefined,
     degree: undefined,
     branch: undefined,

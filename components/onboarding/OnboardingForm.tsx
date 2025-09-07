@@ -16,12 +16,12 @@ import {
 } from "@/lib/validation/onboarding";
 import { saveOnboarding } from "@/actions/profile";
 
-/* shadcn/ui */
+/* shadcn/ui components for form layout and styling */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-/* Local small components */
+/* Local reusable field components for consistency */
 import Field from "./fields/Field";
 import AvatarField from "./fields/AvatarField";
 import PhoneE164Field from "./fields/PhoneE164Field";
@@ -31,10 +31,12 @@ import DirectoryConsents from "./fields/DirectoryConsents";
 import TermsCheckbox from "./fields/TermsCheckbox";
 import SelectYearField from "./fields/SelectYearField";
 
-// Derive the action's result type from the server action itself
+// Derive the server action result type to ensure correctness
 type ActionResult = Awaited<ReturnType<typeof saveOnboarding>>;
+// Specific error result shape
 type ErrResult = Extract<NonNullable<ActionResult>, { ok: false; error: string }>;
 
+// Type guard to identify if action result is an error
 function isErrResult(r: ActionResult): r is ErrResult {
   if (r == null || typeof r !== "object") return false;
   const rec = r as { ok?: unknown; error?: unknown };
@@ -48,33 +50,36 @@ export default function OnboardingForm({
   userEmail?: string;
   userId: string;
 }) {
+  // Hook-form setup with Zod validation schema
   const resolver = zodResolver(OnboardingSchema) as Resolver<OnboardingValues>;
 
   const form = useForm<OnboardingValues>({
     resolver,
     defaultValues: toFormDefaults(userEmail),
-    mode: "onBlur",
+    mode: "onBlur", // validate on blur for better UX
   });
 
-  // useActionState types now match the actual action signature
+  // Server action binding for onboarding save
   const [state, formAction] = React.useActionState<ActionResult, FormData>(
     saveOnboarding,
     null as ActionResult
   );
+  // Transition state for disabling UI while saving
   const [isPending, startTransition] = React.useTransition();
 
   // Focus/scroll to first invalid control on validation error
   React.useEffect(() => {
     const firstInvalid = document.querySelector<HTMLElement>("[aria-invalid='true']");
-    firstInvalid?.focus(); // options-less for broad DOM lib compat
+    firstInvalid?.focus();
     firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [form.formState.errors]);
 
+  // Convert form values into FormData for server action
   const onSubmit = form.handleSubmit((values) => {
     const fd = new FormData();
     Object.entries(values).forEach(([k, v]) => {
       if (k === "interests" && Array.isArray(v)) {
-        v.forEach((i) => fd.append("interests", String(i)));
+        v.forEach((i) => fd.append("interests", String(i))); // multiple entries
       } else if (typeof v === "boolean") {
         fd.set(k, v ? "true" : "false");
       } else if (v != null) {
@@ -84,7 +89,7 @@ export default function OnboardingForm({
     startTransition(() => formAction(fd));
   });
 
-  // ids for simple text inputs
+  // Stable ids for input labels (a11y support)
   const idFullName = React.useId();
   const idEmail = React.useId();
   const idCity = React.useId();
@@ -106,11 +111,12 @@ export default function OnboardingForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-8" noValidate>
+          {/* Profile picture upload */}
           <AvatarField control={form.control} userId={userId} />
 
-          {/* Basic info */}
+          {/* Basic info section */}
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 min-w-0">
-            {/* Email — full-width row */}
+            {/* Email (readonly, non-editable) */}
             <div className="sm:col-span-2 min-w-0">
               <Field label="Email" htmlFor={idEmail} required>
                 <Input
@@ -130,6 +136,7 @@ export default function OnboardingForm({
 
             {/* Gender (small) + Full name (wide) */}
             <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 min-w-0">
+              {/* Gender select */}
               <div className="min-w-0">
                 <SelectEnumField
                   control={form.control}
@@ -141,6 +148,7 @@ export default function OnboardingForm({
                   error={undefined}
                 />
               </div>
+              {/* Full name input */}
               <div className="sm:col-span-2 min-w-0">
                 <Field
                   label="Full name ( As it appears in college records )"
@@ -160,7 +168,7 @@ export default function OnboardingForm({
               </div>
             </div>
 
-            {/* Phone (kept as-is; stacks code→number on mobile) */}
+            {/* Phone number (split into code + number) */}
             <PhoneE164Field
               control={form.control}
               error={errors.phone_e164?.message as string | undefined}
@@ -212,7 +220,7 @@ export default function OnboardingForm({
               />
             </div>
 
-            {/* Branch + Roll */}
+            {/* Branch + Roll number */}
             <div className="min-w-0">
               <SelectEnumField
                 control={form.control}
@@ -234,7 +242,7 @@ export default function OnboardingForm({
               </Field>
             </div>
 
-            {/* Employment type — full-width row */}
+            {/* Employment type (single full-width select) */}
             <div className="sm:col-span-2 min-w-0">
               <SelectEnumField
                 control={form.control}
@@ -271,14 +279,16 @@ export default function OnboardingForm({
             </div>
           </section>
 
-          {/* Interests + Consents (onboarding only) */}
+          {/* Interests grid (multiple selectable options) */}
           <InterestsGrid
             control={form.control}
             error={errors.interests?.message as string | undefined}
           />
 
+          {/* Directory sharing preferences */}
           <DirectoryConsents control={form.control} />
 
+          {/* Terms and privacy consent checkbox */}
           <TermsCheckbox
             control={form.control}
             error={errors.consent_terms_privacy?.message as string | undefined}
@@ -291,6 +301,7 @@ export default function OnboardingForm({
             </p>
           )}
 
+          {/* Submit button aligned to the right */}
           <div className="flex items-center justify-end gap-3">
             <Button type="submit" disabled={isPending} aria-busy={isPending}>
               {isPending ? "Saving..." : "Save & continue"}
