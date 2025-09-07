@@ -68,7 +68,7 @@ export default function DirectoryConsents({
               htmlFor="consent_directory_show_contacts"
               className="text-sm leading-5 cursor-pointer"
             >
-              Show my <b>phone number</b> and <b>email</b> to logged-in members.
+              Show my phone number and email to logged-in members.
             </Label>
           </div>
         )}

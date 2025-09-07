@@ -34,7 +34,7 @@ export default async function DashboardPage() {
     .eq("status", "published")
     .order("has_alumni_referral", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(5);
+    // .limit(5);
 
   const [{ data: profile }, { data: _jobs }] = await Promise.all([
     profilePromise,
@@ -57,7 +57,7 @@ export default async function DashboardPage() {
   if (profile?.branch) sQuery = sQuery.eq("branch", profile.branch);
   if (profile?.degree) sQuery = sQuery.eq("degree", profile.degree);
 
-  const { data: strictMatches } = await sQuery.limit(6);
+  const { data: strictMatches } = await sQuery;
 
   // Fallback: same graduation year only (still excludes me). No random recent feed.
   let suggestions = strictMatches ?? [];
