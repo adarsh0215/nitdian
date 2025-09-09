@@ -53,7 +53,11 @@ export default function FiltersBar({
   busy: boolean;
 }) {
   // Local state seeded from server initial filters
-  const [local, setLocal] = React.useState<DirectoryFilters>(initial);
+  
+  const [local, setLocal] = React.useState<DirectoryFilters>({
+    ...initial,
+    sort: initial.sort ?? "recent",
+  });
 
   // Drawer open state for mobile filters
   const [open, setOpen] = React.useState(false);
@@ -157,8 +161,8 @@ export default function FiltersBar({
             <SelectValue placeholder="Sort" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="name">Name A–Z</SelectItem>
             <SelectItem value="recent">Recently joined</SelectItem>
+            <SelectItem value="name">Name A–Z</SelectItem>
             <SelectItem value="year_desc">Grad year (newest)</SelectItem>
           </SelectContent>
         </Select>
@@ -178,7 +182,8 @@ export default function FiltersBar({
               branch: undefined,
               degree: undefined,
               year: undefined,
-              sort: "name" as const,
+              // Reset sort to your chosen default (recent)
+              sort: "recent" as const,
             };
             setLocal((s) => ({ ...s, ...cleared }));
             onChange({ ...cleared, page: 1 });
@@ -335,7 +340,8 @@ export default function FiltersBar({
                     branch: undefined,
                     degree: undefined,
                     year: undefined,
-                    sort: "name" as const,
+                    // Reset sort to your chosen default (recent)
+                    sort: "recent" as const,
                   };
                   setLocal((s) => ({ ...s, ...cleared }));
                   onChange({ ...cleared, page: 1 });

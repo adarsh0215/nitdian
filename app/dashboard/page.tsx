@@ -7,7 +7,8 @@ import Section from "@/components/dashboard/ui/Section";
 import SuggestionCard from "@/components/dashboard/SuggestionCard";
 import ProfileCard from "@/components/dashboard/ProfileCard";
 import ProfileCompletionCard from "@/components/dashboard/ProfileCompletionCard";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import EventSection from "@/components/home/EventSection"; // <- new import
 
 export default async function DashboardPage() {
   const sb = await supabaseServer();
@@ -25,10 +26,7 @@ export default async function DashboardPage() {
     .eq("id", user.id)
     .maybeSingle();
 
-
-  const [{ data: profile }] = await Promise.all([
-    profilePromise
-  ]);
+  const [{ data: profile }] = await Promise.all([profilePromise]);
 
   if (!profile?.onboarded) redirect("/onboarding");
   const isApproved = !!profile?.is_approved;
@@ -39,16 +37,13 @@ export default async function DashboardPage() {
     .select("id, full_name, avatar_url, branch, graduation_year, company")
     .eq("is_public", true)
     .eq("is_approved", true)
-    .neq("id", user.id); // 🚫 exclude my own profile
+    .neq("id", user.id);
 
   if (profile?.graduation_year != null)
     sQuery = sQuery.eq("graduation_year", profile.graduation_year);
-  // if (profile?.branch) sQuery = sQuery.eq("branch", profile.branch);
-  // if (profile?.degree) sQuery = sQuery.eq("degree", profile.degree);
 
   const { data: strictMatches } = await sQuery;
 
-  // Fallback: same graduation year only (still excludes me). No random recent feed.
   let suggestions = strictMatches ?? [];
   if (suggestions.length === 0) {
     const { data: yearOnly } = await sb
@@ -56,27 +51,17 @@ export default async function DashboardPage() {
       .select("id, full_name, avatar_url, branch, graduation_year, company")
       .eq("is_public", true)
       .eq("is_approved", true)
-      .neq("id", user.id) // 🚫 exclude me here too
+      .neq("id", user.id)
       .eq("graduation_year", profile?.graduation_year ?? -1);
-    // .limit(6);
     suggestions = yearOnly ?? [];
   }
 
-  // Final defensive cleanup: de-dupe and exclude me (just in case)
   const cleanSuggestions = Array.from(
     new Map(
       (suggestions ?? []).filter((p) => p?.id !== user.id).map((p) => [p.id, p])
     ).values()
   );
 
-  // const essentialsMissing =
-  //   !profile?.full_name ||
-  //   !profile?.graduation_year ||
-  //   !profile?.degree ||
-  //   !profile?.branch ||
-  //   !(profile?.interests && profile.interests.length > 0);
-
-  // Count total batchmates by year (exclude me; only approved & public)
   const { count: batchmateCount } = await sb
     .from("profiles")
     .select("id", { count: "exact", head: true })
@@ -91,22 +76,34 @@ export default async function DashboardPage() {
         <div className="rounded-xl border border-yellow-300/50 bg-yellow-50 text-yellow-900 p-3 text-sm flex items-center gap-2 dark:bg-yellow-950/30 dark:text-yellow-100">
           <AlertCircle className="h-4 w-4" />
           Your profile is pending approval. You can still edit your Profile.
-          {/* {isAdmin ? (
-            <span className="ml-auto text-xs opacity-80">
-              (You’re admin—use Admin → Approvals)
-            </span>
-          ) : null} */}
         </div>
       ) : null}
 
-      <div className="">
-        <ProfileCard profile={profile} />
-        {/* {essentialsMissing ? <ProfileCompletionCard profile={profile} /> : null} */}
+      {/* Responsive 2-column grid on large screens, single column on mobile.
+          items-stretch ensures both cards have consistent height. */}
+      <div className="grid gap-6 lg:grid-cols-2 items-stretch">
+        <div className="h-full">
+          <EventSection
+            title="Shri Shankracharya Ji Maharaj at NIT Durgapur"
+            subtitle="Motivational Speech on "
+            dates={[
+              { date: "10 Sept 2025", times: "  5:00 PM" },
+              
+            ]}
+            ctaHref="https://www.youtube.com/live/RQ1jRAJV1fg"
+            ctaLabel="Watch live"
+            
+          />
+        </div>
+
+        <div className="h-full">
+          <ProfileCard profile={profile} />
+          {/* {essentialsMissing ? <ProfileCompletionCard profile={profile} /> : null} */}
+        </div>
       </div>
 
       {isApproved ? (
         <div className="grid gap-6">
-          {/* Main column */}
           <div className="space-y-4 lg:col-span-2">
             <Section
               title={`My Batchmates${
@@ -129,13 +126,8 @@ export default async function DashboardPage() {
                         href="/directory"
                         name={p.full_name ?? "Alumni"}
                         avatar={p.avatar_url}
-                        /* pass rich fields instead of meta so the card formats them properly */
-                        branch={p.branch ?? undefined} // "Mechanical Engineering" → (cleaned to) "Mechanical"
-                        // designation={p.designation ?? undefined}  // optional
-                        company={p.company ?? undefined} // optional
-                        // city={p.city ?? undefined}                // optional
-                        // country={p.country ?? undefined}          // optional
-                        /* meta is now unnecessary (fallback only) */
+                        branch={p.branch ?? undefined}
+                        company={p.company ?? undefined}
                       />
                     </li>
                   ))}
@@ -146,8 +138,6 @@ export default async function DashboardPage() {
                 </div>
               )}
             </Section>
-
-            {/* <JobsWidget jobs={_jobs ?? []} isApproved={isApproved} /> */}
           </div>
         </div>
       ) : null}

@@ -164,7 +164,7 @@ export default function EmailPasswordForm({
           id={emailId}
           name="email"
           type="email"
-          placeholder="you@alumni.com"
+          placeholder="enter your email"
           autoComplete="email"
           inputMode="email"
           required

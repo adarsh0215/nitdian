@@ -32,7 +32,7 @@ function parseFilters(
   sp: Record<string, string | string[] | undefined>
 ): DirectoryFilters {
   const page = Math.max(1, asNumber(sp.page) ?? 1);
-  const sort = (asString(sp.sort) as DirectoryFilters["sort"]) ?? "name";
+  const sort = (asString(sp.sort) as DirectoryFilters["sort"]) ?? "recent";
   return {
     q: asString(sp.q) ?? "",
     branch: asString(sp.branch),

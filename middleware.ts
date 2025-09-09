@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 // Adjust as needed
-const PUBLIC_ROUTES = ["/", "/login", "/signup", "/auth/callback", "/policies/privacy", "/policies/terms", "/coming-soon" ];
+const PUBLIC_ROUTES = ["/", "/login", "/signup", "/auth/callback", "/policies/privacy", "/policies/terms", "/coming-soon", "/dev" ];
 
 
 

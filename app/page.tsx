@@ -1,3 +1,9 @@
+// app/page.tsx (Homepage)
+// Purpose: Compose the homepage from smaller, focused components.
+// Note: This file intentionally keeps some sections commented out (for feature toggles).
+// Do not change imports unless you know the component is being removed — keeping them
+// commented makes it easy to re-enable later.
+
 import Hero from "@/components/home/Hero";
 import BrandStrip from "@/components/home/BrandStrip";
 import ValueGrid from "@/components/home/ValueGrid";
@@ -11,6 +17,7 @@ import SiteFooter from "@/components/home/SiteFooter";
 import Featured from "@/components/home/Featured";
 import { HOMEPAGE_DATA } from "@/components/home/data";
 import ImageTicker from "@/components/home/ImageTicker";
+import EventSection from "@/components/home/EventSection";
 
 export const metadata = {
   title: "Alumni Network — NIT Durgapur",
@@ -18,9 +25,11 @@ export const metadata = {
 };
 
 export default function Page() {
+  // Local alias for the home page data object. Keep as-is for clarity when passing props.
   const d = HOMEPAGE_DATA;
 
   return (
+    // Main wrapper: ensures full viewport height and consistent background/foreground tokens.
     <main className="min-h-[100dvh] bg-background text-foreground">
       {/* Announcement (uncomment if you want to show it) */}
       {/* <AnnouncementBar
@@ -37,10 +46,25 @@ export default function Page() {
         microProof={d.hero.microProof}
       />
 
-      {/* Brand strip */}
+      {/* Brand strip: logos / partner strip directly under hero */}
       <BrandStrip caption={d.brands.caption} brands={d.brands.items} />
 
-      {/* Why join */}
+      <section className="py-10 sm:py-14">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
+          <EventSection
+            title="Shri Shankracharya Ji Maharaj at NIT Durgapur"
+            subtitle="Motivational Speech on"
+            dates={[
+              { date: "10 Sept 2025", times: "  5:00 PM" },
+              
+            ]}
+            ctaHref="/login"
+            ctaLabel="Login to watch"
+          />
+        </div>
+      </section>
+
+      {/* Why join / Value grid */}
       <section className="py-10 sm:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <ValueGrid
@@ -51,7 +75,7 @@ export default function Page() {
         </div>
       </section>
 
-      {/* Highlight (carousel) */}
+      {/* Highlight (carousel) — kept commented for now */}
       {/* <section className="py-10 sm:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Highlight
@@ -95,7 +119,7 @@ export default function Page() {
         </div>
       </section>
 
-      {/* Featured */}
+      {/* Featured section */}
       <section className="py-10 sm:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <Featured
@@ -106,12 +130,15 @@ export default function Page() {
         </div>
       </section>
 
-       <div className="max-w-7xl mx-auto px-4 py-10">
-      <h2 className="text-2xl font-bold mb-6 text-center">Our Alumni Moments</h2>
-      <ImageTicker />
-    </div>
+      {/* Image ticker for alumni moments — kept inside a centered container for consistent spacing */}
+      <div className="max-w-7xl mx-auto px-4 py-10">
+        <h2 className="text-2xl font-bold mb-6 text-center">
+          Our Alumni Moments
+        </h2>
+        <ImageTicker />
+      </div>
 
-      {/* How it works */}
+      {/* How it works / Steps */}
       <section className="py-10 sm:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <HowItWorks

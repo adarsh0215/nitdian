@@ -137,7 +137,7 @@ export default function DirectoryProfileCard({
             <div className=" flex flex-col   text-[15px] leading-6">
               {profile.designation ? (
                 <p className="text-sm text-[#608286] font-bold">
-                  {profile.designation} @ {profile.company}
+                  {profile.designation}  {profile.company ? `@ ${profile.company}`: ""}
                 </p>
               ) : null}
               {profile.company ? (
