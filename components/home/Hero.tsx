@@ -46,7 +46,7 @@ export default function Hero({
             <p className="text-base text-[#EAEAEA] sm:text-lg mb-8">{subtext}</p>
 
             {/* Call-to-actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <div className="flex flex-row items-center justify-center gap-3">
               {/* Primary button */}
               <Button asChild size="lg">
                 <Link href={primary.href}>{primary.label}</Link>
