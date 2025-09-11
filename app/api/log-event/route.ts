@@ -10,17 +10,14 @@ function getEnvVar(name: string | undefined): string | null {
 }
 
 export async function POST(req: Request) {
-  // Lazy-read envs so we don't crash at module-eval / build time
   const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const SUPABASE_SERVICE_ROLE_KEY = getEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    // Log minimal info (no secrets)
     console.error("log-event: missing SUPABASE env vars");
     return NextResponse.json({ error: "Server misconfigured: missing supabase key" }, { status: 500 });
   }
 
-  // Create server client here (request-time)
   const supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
@@ -40,7 +37,6 @@ export async function POST(req: Request) {
     const payload = { user_id, user_email, action };
     const sinceIso = new Date(Date.now() - DEDUPE_MS).toISOString();
 
-    // Check for recent duplicate (prefer user_id, fallback user_email)
     let duplicateFound = false;
     if (user_id) {
       const { data, error } = await supabaseServer
@@ -76,7 +72,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, skipped: true }, { status: 200 });
     }
 
-    // Insert and return inserted id for observability
+    // Define a type for the inserted row
+    type InsertedRow = { id: number };
+
     const { data: insertData, error: insertError } = await supabaseServer
       .from("login_history")
       .insert([payload])
@@ -88,7 +86,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: String(insertError?.message ?? "insert failed") }, { status: 500 });
     }
 
-    const insertedId = Array.isArray(insertData) && insertData.length > 0 ? (insertData[0] as any).id ?? null : null;
+    const insertedId =
+      Array.isArray(insertData) && insertData.length > 0
+        ? (insertData[0] as InsertedRow).id
+        : null;
+
     return NextResponse.json({ success: true, skipped: false, id: insertedId }, { status: 201 });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
