@@ -13,9 +13,18 @@ export async function POST(req: Request) {
   const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const SUPABASE_SERVICE_ROLE_KEY = getEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+  // 🔎 Debug: log env presence (never the actual values!)
+  console.log("ENV CHECK", {
+    url: SUPABASE_URL ? "present" : "MISSING",
+    service: SUPABASE_SERVICE_ROLE_KEY ? "present" : "MISSING",
+  });
+
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error("log-event: missing SUPABASE env vars");
-    return NextResponse.json({ error: "Server misconfigured: missing supabase key" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Server misconfigured: missing supabase key" },
+      { status: 500 }
+    );
   }
 
   const supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -24,6 +33,8 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json().catch(() => ({}));
+    console.log("[/api/log-event] incoming body keys:", Object.keys(body || {})); // 🔎 Debug
+
     const { user_id = null, user_email = null, action } = body as {
       user_id?: string | null;
       user_email?: string | null;
@@ -31,7 +42,10 @@ export async function POST(req: Request) {
     };
 
     if (!action || typeof action !== "string" || !ALLOWED_ACTIONS.has(action)) {
-      return NextResponse.json({ error: "Invalid or missing action" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid or missing action" },
+        { status: 400 }
+      );
     }
 
     const payload = { user_id, user_email, action };
@@ -69,10 +83,10 @@ export async function POST(req: Request) {
     }
 
     if (duplicateFound) {
+      console.log("[/api/log-event] duplicate detected, skipping insert");
       return NextResponse.json({ success: true, skipped: true }, { status: 200 });
     }
 
-    // Define a type for the inserted row
     type InsertedRow = { id: number };
 
     const { data: insertData, error: insertError } = await supabaseServer
@@ -83,7 +97,10 @@ export async function POST(req: Request) {
 
     if (insertError) {
       console.error("log-event: insert error", insertError?.message ?? insertError);
-      return NextResponse.json({ error: String(insertError?.message ?? "insert failed") }, { status: 500 });
+      return NextResponse.json(
+        { error: String(insertError?.message ?? "insert failed") },
+        { status: 500 }
+      );
     }
 
     const insertedId =
@@ -91,6 +108,7 @@ export async function POST(req: Request) {
         ? (insertData[0] as InsertedRow).id
         : null;
 
+    console.log("[/api/log-event] insert success, id:", insertedId); // 🔎 Debug
     return NextResponse.json({ success: true, skipped: false, id: insertedId }, { status: 201 });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
