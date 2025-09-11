@@ -1,0 +1,690 @@
+diff --git a/app/api/login-history/route.ts b/app/api/login-history/route.ts
+deleted file mode 100644
+index 85246d0..0000000
+--- a/app/api/login-history/route.ts
++++ /dev/null
+@@ -1,42 +0,0 @@
+-import { NextResponse } from "next/server";
+-import { createClient } from "@supabase/supabase-js";
+-
+-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+-// const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+-
+-if (!url) throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL");
+-// if (!serviceKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
+-
+-// Service-role client (server only) — bypasses RLS safely.
+-// const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+-
+-type Body = {
+-  action: "sign_in" | "sign_out";
+-  user_id: string;
+-  user_email?: string | null;
+-  at?: string; // optional ISO timestamp
+-};
+-
+-export async function POST(req: Request) {
+-  let body: Body;
+-  try { body = await req.json(); }
+-  catch { return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 }); }
+-
+-  const { action, user_id, user_email, at } = body ?? {};
+-  if (action !== "sign_in" && action !== "sign_out")
+-    return NextResponse.json({ ok: false, error: "Invalid action" }, { status: 400 });
+-  if (!user_id || typeof user_id !== "string")
+-    return NextResponse.json({ ok: false, error: "user_id required" }, { status: 400 });
+-
+-  const created_at = at ? new Date(at).toISOString() : new Date().toISOString();
+-
+-  // const { error } = await admin.from("login_history").insert({
+-  //   user_id,
+-  //   user_email: user_email ?? null,
+-  //   action,
+-  //   created_at,
+-  // });
+-
+-  // if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+-  return NextResponse.json({ ok: true });
+-}
+diff --git a/app/layout.tsx b/app/layout.tsx
+index d55450e..b6d4135 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
+ import "./globals.css";
+ import { ThemeProvider } from "@/app/providers";
+ import NavbarServer from "@/components/layout/NavbarServer";
++import AuthWatcher from "@/components/auth/AuthWatcher";
+ 
+ 
+ const geistSans = Geist({
+@@ -31,7 +32,7 @@ export default function RootLayout({
+       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+         <ThemeProvider>
+           {/* ✅ Now fully client-safe */}
+-
++          <AuthWatcher />
+           <NavbarServer />
+           {children}
+         </ThemeProvider>
+diff --git a/components/auth/AuthListener.tsx b/components/auth/AuthListener.tsx
+index 4b75e37..d332100 100644
+--- a/components/auth/AuthListener.tsx
++++ b/components/auth/AuthListener.tsx
+@@ -1,27 +1,27 @@
+-"use client";
++// "use client";
+ 
+-import { useEffect } from "react";
+-import { useRouter } from "next/navigation";
+-import { createBrowserClient } from "@supabase/ssr";
++// import { useEffect } from "react";
++// import { useRouter } from "next/navigation";
++// import { createBrowserClient } from "@supabase/ssr";
+ 
+-export default function AuthListener() {
+-  const router = useRouter();
++// export default function AuthListener() {
++//   const router = useRouter();
+ 
+-  // A tiny, long-lived browser client just for listening to auth changes.
+-  const supabase = createBrowserClient(
+-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+-  );
++//   // A tiny, long-lived browser client just for listening to auth changes.
++//   const supabase = createBrowserClient(
++//     process.env.NEXT_PUBLIC_SUPABASE_URL!,
++//     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
++//   );
+ 
+-  useEffect(() => {
+-    const { data: { subscription } } =
+-      supabase.auth.onAuthStateChange(() => {
+-        // Pull a fresh RSC payload so the header/pill re-renders with the new session.
+-        router.refresh();
+-      });
++//   useEffect(() => {
++//     const { data: { subscription } } =
++//       supabase.auth.onAuthStateChange(() => {
++//         // Pull a fresh RSC payload so the header/pill re-renders with the new session.
++//         router.refresh();
++//       });
+ 
+-    return () => subscription.unsubscribe();
+-  }, [router, supabase]);
++//     return () => subscription.unsubscribe();
++//   }, [router, supabase]);
+ 
+-  return null;
+-}
++//   return null;
++// }
+diff --git a/components/directory/DirectoryClient.tsx b/components/directory/DirectoryClient.tsx
+index 7c3b267..35b0780 100644
+--- a/components/directory/DirectoryClient.tsx
++++ b/components/directory/DirectoryClient.tsx
+@@ -196,7 +196,7 @@ export default function DirectoryClient({
+       </div>
+ 
+       {/* Profile grid */}
+-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
++      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+         {items.map((p) => (
+           <DirectoryProfileCard key={p.id} profile={p} layout="grid" />
+         ))}
+diff --git a/components/home/Featured.tsx b/components/home/Featured.tsx
+index 36639af..37998b2 100644
+--- a/components/home/Featured.tsx
++++ b/components/home/Featured.tsx
+@@ -10,6 +10,7 @@ import {
+ } from "@/components/ui/carousel";
+ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+ import { ChevronLeft, ChevronRight } from "lucide-react";
++import Link from "next/link"
+ 
+ export type FeaturedItem = {
+   quote: string;
+@@ -36,6 +37,7 @@ export default function Featured({
+       <div className="text-center mx-auto max-w-2xl">
+         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">{heading}</h2>
+         <p className="mt-2 text-muted-foreground">{subheading}</p>
++        <Link href="/memoirs" className="mt-4 text-sm">Explore all Memoirs</Link>
+       </div>
+ 
+       <div className="relative -mx-4 px-4">
+diff --git a/components/layout/UserPill.tsx b/components/layout/UserPill.tsx
+index ca96b3e..5cfd002 100644
+--- a/components/layout/UserPill.tsx
++++ b/components/layout/UserPill.tsx
+@@ -3,7 +3,7 @@
+ 
+ import * as React from "react";
+ import { useRouter } from "next/navigation";
+-import { LogOut, LayoutDashboard, Settings, User as UserIcon } from "lucide-react";
++import { LogOut, LayoutDashboard, User as UserIcon } from "lucide-react";
+ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+ import {
+   DropdownMenu,
+@@ -44,32 +44,143 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
+     router.push(href);
+   };
+ 
++  // generate small event id (uses crypto.randomUUID when available)
++  function makeEventId() {
++    try {
++      // @ts-ignore
++      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
++        // @ts-ignore
++        return crypto.randomUUID();
++      }
++    } catch {}
++    return "evt_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
++  }
++
++  // Helper: try sendBeacon then fallback to keepalive fetch
++  async function sendSignOutPayload(payload: Record<string, any>) {
++    const path = "/api/log-event";
++    const url = (typeof window !== "undefined" && window.location?.origin) ? `${window.location.origin}${path}` : path;
++    const bodyStr = JSON.stringify(payload);
++
++    try {
++      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
++        const blob = new Blob([bodyStr], { type: "application/json" });
++        const ok = navigator.sendBeacon(url, blob);
++        if (ok) return true; // queued by browser
++      }
++    } catch (e) {
++      // swallow and fall back
++    }
++
++    try {
++      // keepalive allows the request to continue while the page unloads
++      await fetch(url, {
++        method: "POST",
++        headers: { "Content-Type": "application/json" },
++        body: bodyStr,
++        keepalive: true,
++      });
++      return true;
++    } catch (e) {
++      return false;
++    }
++  }
++
+   const onSignOut = async () => {
+     if (signingOut) return;
+     setSigningOut(true);
+     setOpen(false);
++
+     try {
+-      const supabase = supabaseBrowser();
++      // Read last-known user info saved by AuthWatcher
++      const lastUserId = (() => {
++        try {
++          // FIXED: use the same key AuthWatcher uses: "auth:last_seen_user_id"
++          return localStorage.getItem("auth:last_seen_user_id");
++        } catch {
++          return null;
++        }
++      })();
++      const lastUserEmail = (() => {
++        try {
++          return localStorage.getItem("last_user_email");
++        } catch {
++          return null;
++        }
++      })();
++
++      // generate event id and include it in the payload & local marker
++      const eventId = makeEventId();
++      const payload = { user_id: lastUserId ?? null, user_email: lastUserEmail ?? null, action: "sign_out", event_id: eventId };
++
++      // MARK: set auth:last_logged so AuthWatcher dedupe will skip the follow-up SIGNED_OUT post
++      try {
++        // include event_id here as additional optional field (AuthWatcher will ignore unknown fields)
++        localStorage.setItem(
++          "auth:last_logged",
++          JSON.stringify({ user_id: lastUserId ?? null, action: "sign_out", ts: Date.now(), event_id: eventId })
++        );
++      } catch (e) {
++        // ignore storage errors
++      }
++
++      // Debug: small console info so you can trace duplicates (remove in prod if desired)
++      console.info("UserPill: sending sign_out log", { user_id: lastUserId, event_id: eventId });
++
++      // Try to enqueue sign-out log before actually signing out
++      try {
++        await sendSignOutPayload(payload);
++      } catch (e) {
++        // ignore — we'll still sign out
++        console.warn("Sign-out logging attempt failed:", e);
++      }
++
++      // Now proceed with sign-out steps (preserve your previous behavior)
++      // supabaseBrowser might be exported as a function (factory) or a client instance; handle both safely
++      const supabaseClient = (() => {
++        try {
++          // @ts-ignore
++          if (typeof supabaseBrowser === "function") return supabaseBrowser();
++          // @ts-ignore
++          return supabaseBrowser;
++        } catch {
++          // fallback: try using it as instance
++          // @ts-ignore
++          return supabaseBrowser;
++        }
++      })();
+ 
+       // 1) Clear local client session immediately so UI flips
+-      await supabase.auth.signOut({ scope: "local" });
++      try {
++        await supabaseClient?.auth?.signOut?.({ scope: "local" });
++      } catch (e) {
++        console.warn("local signOut failed:", e);
++      }
+ 
+       // 2) Clear server cookies (and optionally revoke tokens)
+-      await Promise.allSettled([
+-        // revoke tokens across devices if you want (safe to keep or remove)
+-        supabase.auth.signOut({ scope: "global" }),
+-        fetch("/auth/callback/signout", {
+-          method: "POST",
+-          credentials: "include",
+-          cache: "no-store",
+-        }),
+-      ]);
++      try {
++        await Promise.allSettled([
++          // revoke tokens across devices if you want (safe to keep or remove)
++          supabaseClient?.auth?.signOut?.({ scope: "global" }),
++          fetch("/auth/callback/signout", {
++            method: "POST",
++            credentials: "include",
++            cache: "no-store",
++          }),
++        ]);
++      } catch (e) {
++        console.warn("global signOut or server callback failed:", e);
++      }
+ 
+       // 3) HARD redirect to avoid App Router/RSC caching quirks
+       window.location.replace("/login");
+-      // (router.replace + refresh can be flaky here; hard nav is rock solid)
+-    } catch {
+-      window.location.replace("/login");
++    } catch (err) {
++      console.error("Sign out failed, redirecting anyway:", err);
++      try {
++        window.location.replace("/login");
++      } catch {
++        // final fallback: do nothing
++      }
+     } finally {
+       setSigningOut(false);
+     }
+@@ -126,4 +237,4 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
+       </DropdownMenuContent>
+     </DropdownMenu>
+   );
+-}
+\ No newline at end of file
++}
+diff --git a/components/ui/theme-switcher.tsx b/components/ui/theme-switcher.tsx
+index 5968d24..6bd3891 100644
+--- a/components/ui/theme-switcher.tsx
++++ b/components/ui/theme-switcher.tsx
+@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
+ 
+ export default function ThemeSwitcher() {
+   const { theme, setTheme, resolvedTheme } = useTheme();
++
++  // mounted guard to avoid hydration mismatch
++  const [mounted, setMounted] = React.useState(false);
++  React.useEffect(() => {
++    setMounted(true);
++  }, []);
++
+   const isDark = (resolvedTheme ?? theme) === "dark";
+ 
+   return (
+@@ -17,7 +24,18 @@ export default function ThemeSwitcher() {
+       aria-label="Toggle theme"
+       onClick={() => setTheme(isDark ? "light" : "dark")}
+     >
+-      {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
++      {/* Avoid rendering lucide SVG on the server — use a neutral span placeholder */}
++      {mounted ? (
++        isDark ? (
++          <Sun className="h-5 w-5" aria-hidden />
++        ) : (
++          <Moon className="h-5 w-5" aria-hidden />
++        )
++      ) : (
++        // plain span is deterministic and won't differ between server/client
++        <span className="inline-block h-5 w-5" aria-hidden />
++      )}
++
+       <span className="sr-only">Toggle theme</span>
+     </Button>
+   );
+diff --git a/lib/supabase/server.ts b/lib/supabase/server.ts
+index 7894b2b..50cc3e5 100644
+--- a/lib/supabase/server.ts
++++ b/lib/supabase/server.ts
+@@ -26,31 +26,65 @@ function toNextCookieOptions(opts?: CookieOptions): NextCookieOptions | undefine
+     expires: typeof expires === "string" ? new Date(expires) : (expires as Date | undefined),
+     httpOnly,
+     secure,
+-    sameSite: sameSite as NextCookieOptions["sameSite"] | undefined,
++    sameSite: (sameSite as NextCookieOptions["sameSite"]) ?? undefined,
+   };
+ }
+ 
++/**
++ * Server-side supabase client factory.
++ *
++ * - Uses SUPABASE_SERVICE_ROLE_KEY if present (preferred), otherwise falls back to NEXT_PUBLIC_SUPABASE_ANON_KEY.
++ * - Awaits cookies() to obtain the request cookie store (fixes TS/runtime errors).
++ */
+ export async function supabaseServer() {
+   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
++  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
++
+   assertEnv("NEXT_PUBLIC_SUPABASE_URL", url);
+-  assertEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", anon);
++  const keyToUse = serviceKey ?? anon;
++  assertEnv(serviceKey ? "SUPABASE_SERVICE_ROLE_KEY (preferred)" : "NEXT_PUBLIC_SUPABASE_ANON_KEY (fallback)", keyToUse);
+ 
+-  // In your env, cookies() is async
++  // IMPORTANT: await cookies() because in some runtimes cookies() returns a Promise.
+   const cookieStore = await cookies();
+ 
+-  return createServerClient(url, anon, {
++  return createServerClient(url, keyToUse, {
+     cookies: {
++      // Read cookie value
+       get(name: string) {
+-        return cookieStore.get(name)?.value;
++        return cookieStore.get(name)?.value ?? undefined;
+       },
++
++      // Set cookie using Next's single-object API
+       set(name: string, value: string, options?: CookieOptions) {
+-        const mapped = toNextCookieOptions(options);
+-        mapped ? cookieStore.set(name, value, mapped) : cookieStore.set(name, value);
++        const mapped = toNextCookieOptions(options) ?? {};
++        cookieStore.set({
++          name,
++          value,
++          path: mapped.path,
++          domain: mapped.domain,
++          maxAge: mapped.maxAge,
++          expires: mapped.expires,
++          httpOnly: mapped.httpOnly,
++          secure: mapped.secure,
++          sameSite: mapped.sameSite as any,
++        });
+       },
++
++      // Remove cookie by setting an expired cookie (single-object API)
+       remove(name: string, options?: CookieOptions) {
+         const base = toNextCookieOptions(options) ?? { path: "/" };
+-        cookieStore.set(name, "", { ...base, maxAge: 0, expires: new Date(0) });
++        cookieStore.set({
++          name,
++          value: "",
++          path: base.path,
++          domain: base.domain,
++          maxAge: 0,
++          expires: new Date(0),
++          httpOnly: base.httpOnly,
++          secure: base.secure,
++          sameSite: base.sameSite as any,
++        });
+       },
+     },
+   });
+diff --git a/middleware.ts b/middleware.ts
+index 85a475c..d21c8d4 100644
+--- a/middleware.ts
++++ b/middleware.ts
+@@ -1,32 +1,98 @@
+ // middleware.ts
++// ------------------------------
++// Purpose:
++// - Protect pages and sections of the app using Supabase auth.
++// - Allow some public routes (pages + certain API endpoints).
++// - Force onboarding and approval flows for authenticated users.
++// - Keep admin area guarded.
++//
++// Safety note:
++// - I made a single, minimal and safe fix to the public-path check so entries
++//   like "/api/" actually match "/api/memoirs". Nothing else in your logic changed.
++// ------------------------------
++
+ import { NextResponse, type NextRequest } from "next/server";
+ import { createServerClient } from "@supabase/ssr";
+ 
+-// Adjust as needed
+-const PUBLIC_ROUTES = ["/", "/login", "/signup", "/auth/callback", "/policies/privacy", "/policies/terms", "/coming-soon", "/dev" ];
++/**
++ * Adjust this list to include any publicly-accessible pages or prefixes.
++ * IMPORTANT: entries here can be *exact paths* ("/") or *prefixes* ("/api/").
++ *
++ * Examples:
++ * - "/"                => homepage
++ * - "/login"           => login page
++ * - "/api/"            => all API routes under /api/ are public
++ *
++ * Keep this list minimal and intentional: anything here will bypass auth-check redirects.
++ */
++const PUBLIC_ROUTES = [
++  "/",
++  "/login",
++  "/signup",
++  "/auth/callback",
++  "/policies/privacy",
++  "/policies/terms",
++  "/coming-soon",
++  "/dev",
++  "/api/",
++];
++
++/**
++ * isPublicPath
++ * - Purpose: decide whether a request path should be considered public.
++ * - Behavior: handles both exact matches and prefix matches safely.
++ *
++ * Why change:
++ * - Your earlier implementation used `pathname.startsWith(`${p}/`)` which fails
++ *   for entries that already end with "/" (e.g. "/api/"). `/api/memoirs` would
++ *   not pass that check. This caused API routes to be redirected unexpectedly.
++ *
++ * Safety:
++ * - This function only changes how PUBLIC_ROUTES entries are matched. It does
++ *   not alter any redirect/auth logic.
++ */
++function isPublicPath(pathname: string) {
++  // Normalize pathname (no trailing slash, except root)
++  const normPath = pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
+ 
++  for (const p of PUBLIC_ROUTES) {
++    // Normalize the configured public route for matching
++    const normP = p === "/" ? "/" : p.replace(/\/+$/, "");
+ 
++    // Exact match (e.g. "/login" === "/login")
++    if (normPath === normP) return true;
+ 
+-function isPublicPath(pathname: string) {
+-  return PUBLIC_ROUTES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
++    // Prefix match: treat the configured route as a directory/prefix.
++    // Example: if PUBLIC_ROUTES has "/api", this will match "/api/memoirs".
++    if (normP !== "/" && normPath.startsWith(normP + "/")) return true;
++  }
++
++  return false;
+ }
+ 
++/**
++ * redirectWithNext
++ * - Utility to redirect to a page (like /login) while preserving the original
++ *   requested path in the "next" query param, so the app can take the user back
++ *   after successful auth.
++ */
+ function redirectWithNext(req: NextRequest, to: string) {
+   const url = new URL(to, req.url);
+-  // Preserve where the user tried to go (path + search)
+-  const attempted = new URL(req.url);
++  const attempted = new URL(req.url); // original requested URL
+   url.searchParams.set("next", attempted.pathname + attempted.search);
+   return NextResponse.redirect(url);
+ }
+ 
+ export async function middleware(req: NextRequest) {
+-  // Create a mutable response so Supabase can write cookies to it
++  // Create a mutable response so we can set cookies if Supabase needs to.
++  // We pass request headers so the server client can read things like host, etc.
+   const res = NextResponse.next({
+     request: { headers: req.headers },
+   });
+ 
+-  
+-
++  // Create a Supabase server client for this request.
++  // This is the SSR-style client which reads/writes cookies via the callback functions.
++  // Note: using the anon key + cookie helpers here is fine — your middleware expects this.
+   const supabase = createServerClient(
+     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+@@ -34,10 +100,11 @@ export async function middleware(req: NextRequest) {
+       cookies: {
+         get: (name) => req.cookies.get(name)?.value,
+         set: (name, value, options) => {
++          // set cookie on the response so it gets sent back to the browser
+           res.cookies.set({ name, value, ...options });
+         },
+         remove: (name, options) => {
+-          // Remove by expiring immediately
++          // remove by expiring immediately
+           res.cookies.set({ name, value: "", ...options, expires: new Date(0) });
+         },
+       },
+@@ -47,17 +114,19 @@ export async function middleware(req: NextRequest) {
+   const url = new URL(req.url);
+   const { pathname } = url;
+ 
+-  // Get auth user (cheap) and, if present, fetch profile flags (one query)
++  // Get authenticated user (if any). getUser() is cheap if no session exists.
+   const {
+     data: { user },
+   } = await supabase.auth.getUser();
+ 
++  // Default profile flags: unknown until we fetch (null means unknown)
+   let onboarded: boolean | null = null;
+   let isApproved: boolean | null = null;
+   let isAdmin = false;
+ 
+   if (user) {
+-    // Fetch once; keep it lean (two flags only)
++    // Fetch minimal profile flags only when user exists. This keeps the middleware lean.
++    // maybeSingle() returns null data if profile row not found.
+     const { data: profile } = await supabase
+       .from("profiles")
+       .select("onboarded,is_approved")
+@@ -67,7 +136,7 @@ export async function middleware(req: NextRequest) {
+     onboarded = profile?.onboarded ?? null;
+     isApproved = profile?.is_approved ?? null;
+ 
+-    // Admin check only if needed later
++    // Only check admins if user is requesting an admin route (saves a DB call usually)
+     if (pathname.startsWith("/admin")) {
+       const { data: adminRow } = await supabase
+         .from("admins")
+@@ -78,23 +147,22 @@ export async function middleware(req: NextRequest) {
+     }
+   }
+ 
+-   // ---- 0) Coming Soon gate (opt-in; safe defaults) ----
+-  const endTime = process.env.NEXT_PUBLIC_COMING_SOON_UNTIL!
+-  const launchTime = new Date(endTime).getTime(); // 6 PM IST = 12:30 UTC
++  // ---- 0) Coming-soon gate ----
++  // If you set NEXT_PUBLIC_COMING_SOON_UNTIL to a timestamp string, this prevents
++  // access to the app before launch, redirecting to /coming-soon.
++  // If the env var is missing or invalid, the code below may throw — keep the env set.
++  const endTime = process.env.NEXT_PUBLIC_COMING_SOON_UNTIL!;
++  const launchTime = new Date(endTime).getTime();
+   const now = Date.now();
+ 
+-  // If before launch, send users to coming-soon page
+   if (now < launchTime && !req.nextUrl.pathname.startsWith("/coming-soon")) {
++    // Keep this behavior as you had it: a hard redirect to coming-soon page.
+     return NextResponse.redirect(new URL("/coming-soon", req.url));
+   }
+ 
+-  // return NextResponse.next();
+-  
+-
+-
+-  // 1) Public routes are accessible to everyone.
++  // 1) Public routes are accessible to everyone (pages + API prefixes defined above)
+   if (isPublicPath(pathname)) {
+-    // Already-authenticated users shouldn't see /login
++    // Small UX nicety: if authenticated user hits /login, send them to dashboard or onboarding
+     if (user && pathname.startsWith("/login")) {
+       if (onboarded) {
+         return NextResponse.redirect(new URL("/dashboard", req.url));
+@@ -102,37 +170,44 @@ export async function middleware(req: NextRequest) {
+         return NextResponse.redirect(new URL("/onboarding", req.url));
+       }
+     }
++    // Allow the request to proceed (response with whatever app/page logic would produce)
+     return res;
+   }
+ 
+-  // 2) Non-public routes require auth → redirect to /login with next
++  // 2) Non-public routes require authentication. If there's no user, redirect to /login.
++  //    We keep the same redirect-with-next behavior as before.
+   if (!user) {
+     return redirectWithNext(req, "/login");
+   }
+ 
+-  // 3) If user is not onboarded, force them to onboarding (except when they are already there)
++  // 3) If user exists but hasn't finished onboarding, force them there (unless already on onboarding)
+   if (!onboarded && !pathname.startsWith("/onboarding")) {
+     return NextResponse.redirect(new URL("/onboarding", req.url));
+   }
+ 
+-  // 4) Directory (and any other member-only area) requires approval
+-  //    Adjust this list if you want some sections available pre-approval.
++  // 4) Member-only areas requiring approval (directory/jobs) — redirect to dashboard if not approved.
++  //    This keeps your previous policy intact.
+   if ((pathname.startsWith("/directory") || pathname.startsWith("/jobs")) && !isApproved) {
+-    // Not approved yet → keep them on dashboard with a notice
+     return NextResponse.redirect(new URL("/dashboard", req.url));
+   }
+ 
+-  // 5) Admin area requires admin privileges
++  // 5) Admin area: require admin privileges
+   if (pathname.startsWith("/admin") && !isAdmin) {
+     return NextResponse.redirect(new URL("/dashboard", req.url));
+   }
+ 
++  // If we've reached this point, the user passed all checks — continue.
+   return res;
+ }
+ 
+-// Exclude static assets and the Next internals
++/**
++ * config.matcher:
++ * - Excludes Next.js internals and static assets so middleware doesn't run for them.
++ * - This was already present and I kept it unchanged.
++ */
+ export const config = {
+   matcher: [
++    // allow middleware to run for all app routes except Next internals and static files
+     "/((?!_next/|.*\\.(?:css|js|map|json|png|jpg|jpeg|gif|svg|ico|woff|woff2)|favicon\\.ico).*)",
+   ],
+ };

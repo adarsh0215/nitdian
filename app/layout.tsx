@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/app/providers";
 import NavbarServer from "@/components/layout/NavbarServer";
+import AuthWatcher from "@/components/auth/AuthWatcher";
 
 
 const geistSans = Geist({
@@ -31,7 +32,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
           {/* ✅ Now fully client-safe */}
-
+          <AuthWatcher />
           <NavbarServer />
           {children}
         </ThemeProvider>

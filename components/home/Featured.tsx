@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/carousel";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link"
 
 export type FeaturedItem = {
   quote: string;
@@ -36,6 +37,7 @@ export default function Featured({
       <div className="text-center mx-auto max-w-2xl">
         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">{heading}</h2>
         <p className="mt-2 text-muted-foreground">{subheading}</p>
+        <Link href="/memoirs" className="mt-4 text-sm">Explore all Memoirs</Link>
       </div>
 
       <div className="relative -mx-4 px-4">

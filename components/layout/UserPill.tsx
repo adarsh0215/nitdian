@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, LayoutDashboard, Settings, User as UserIcon } from "lucide-react";
+import { LogOut, LayoutDashboard, User as UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -44,32 +44,143 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
     router.push(href);
   };
 
+  // generate small event id (uses crypto.randomUUID when available)
+  function makeEventId() {
+    try {
+      // @ts-ignore
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        // @ts-ignore
+        return crypto.randomUUID();
+      }
+    } catch {}
+    return "evt_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
+  }
+
+  // Helper: try sendBeacon then fallback to keepalive fetch
+  async function sendSignOutPayload(payload: Record<string, any>) {
+    const path = "/api/log-event";
+    const url = (typeof window !== "undefined" && window.location?.origin) ? `${window.location.origin}${path}` : path;
+    const bodyStr = JSON.stringify(payload);
+
+    try {
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        const blob = new Blob([bodyStr], { type: "application/json" });
+        const ok = navigator.sendBeacon(url, blob);
+        if (ok) return true; // queued by browser
+      }
+    } catch (e) {
+      // swallow and fall back
+    }
+
+    try {
+      // keepalive allows the request to continue while the page unloads
+      await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: bodyStr,
+        keepalive: true,
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   const onSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
     setOpen(false);
+
     try {
-      const supabase = supabaseBrowser();
+      // Read last-known user info saved by AuthWatcher
+      const lastUserId = (() => {
+        try {
+          // FIXED: use the same key AuthWatcher uses: "auth:last_seen_user_id"
+          return localStorage.getItem("auth:last_seen_user_id");
+        } catch {
+          return null;
+        }
+      })();
+      const lastUserEmail = (() => {
+        try {
+          return localStorage.getItem("last_user_email");
+        } catch {
+          return null;
+        }
+      })();
+
+      // generate event id and include it in the payload & local marker
+      const eventId = makeEventId();
+      const payload = { user_id: lastUserId ?? null, user_email: lastUserEmail ?? null, action: "sign_out", event_id: eventId };
+
+      // MARK: set auth:last_logged so AuthWatcher dedupe will skip the follow-up SIGNED_OUT post
+      try {
+        // include event_id here as additional optional field (AuthWatcher will ignore unknown fields)
+        localStorage.setItem(
+          "auth:last_logged",
+          JSON.stringify({ user_id: lastUserId ?? null, action: "sign_out", ts: Date.now(), event_id: eventId })
+        );
+      } catch (e) {
+        // ignore storage errors
+      }
+
+      // Debug: small console info so you can trace duplicates (remove in prod if desired)
+      console.info("UserPill: sending sign_out log", { user_id: lastUserId, event_id: eventId });
+
+      // Try to enqueue sign-out log before actually signing out
+      try {
+        await sendSignOutPayload(payload);
+      } catch (e) {
+        // ignore — we'll still sign out
+        console.warn("Sign-out logging attempt failed:", e);
+      }
+
+      // Now proceed with sign-out steps (preserve your previous behavior)
+      // supabaseBrowser might be exported as a function (factory) or a client instance; handle both safely
+      const supabaseClient = (() => {
+        try {
+          // @ts-ignore
+          if (typeof supabaseBrowser === "function") return supabaseBrowser();
+          // @ts-ignore
+          return supabaseBrowser;
+        } catch {
+          // fallback: try using it as instance
+          // @ts-ignore
+          return supabaseBrowser;
+        }
+      })();
 
       // 1) Clear local client session immediately so UI flips
-      await supabase.auth.signOut({ scope: "local" });
+      try {
+        await supabaseClient?.auth?.signOut?.({ scope: "local" });
+      } catch (e) {
+        console.warn("local signOut failed:", e);
+      }
 
       // 2) Clear server cookies (and optionally revoke tokens)
-      await Promise.allSettled([
-        // revoke tokens across devices if you want (safe to keep or remove)
-        supabase.auth.signOut({ scope: "global" }),
-        fetch("/auth/callback/signout", {
-          method: "POST",
-          credentials: "include",
-          cache: "no-store",
-        }),
-      ]);
+      try {
+        await Promise.allSettled([
+          // revoke tokens across devices if you want (safe to keep or remove)
+          supabaseClient?.auth?.signOut?.({ scope: "global" }),
+          fetch("/auth/callback/signout", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store",
+          }),
+        ]);
+      } catch (e) {
+        console.warn("global signOut or server callback failed:", e);
+      }
 
       // 3) HARD redirect to avoid App Router/RSC caching quirks
       window.location.replace("/login");
-      // (router.replace + refresh can be flaky here; hard nav is rock solid)
-    } catch {
-      window.location.replace("/login");
+    } catch (err) {
+      console.error("Sign out failed, redirecting anyway:", err);
+      try {
+        window.location.replace("/login");
+      } catch {
+        // final fallback: do nothing
+      }
     } finally {
       setSigningOut(false);
     }

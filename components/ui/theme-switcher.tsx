@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 
 export default function ThemeSwitcher() {
   const { theme, setTheme, resolvedTheme } = useTheme();
+
+  // mounted guard to avoid hydration mismatch
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const isDark = (resolvedTheme ?? theme) === "dark";
 
   return (
@@ -17,7 +24,18 @@ export default function ThemeSwitcher() {
       aria-label="Toggle theme"
       onClick={() => setTheme(isDark ? "light" : "dark")}
     >
-      {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+      {/* Avoid rendering lucide SVG on the server — use a neutral span placeholder */}
+      {mounted ? (
+        isDark ? (
+          <Sun className="h-5 w-5" aria-hidden />
+        ) : (
+          <Moon className="h-5 w-5" aria-hidden />
+        )
+      ) : (
+        // plain span is deterministic and won't differ between server/client
+        <span className="inline-block h-5 w-5" aria-hidden />
+      )}
+
       <span className="sr-only">Toggle theme</span>
     </Button>
   );
