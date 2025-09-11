@@ -21,6 +21,9 @@ export type UserPillData = {
   avatarUrl: string | null;
 };
 
+// canonical key (must match AuthWatcher.tsx)
+const LS_LAST_USER_EMAIL = "auth:last_user_email";
+
 export default function UserPill({ name, email, avatarUrl }: UserPillData) {
   const router = useRouter();
   const [signingOut, setSigningOut] = React.useState(false);
@@ -44,7 +47,6 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
     router.push(href);
   };
 
-  // generate small event id (uses crypto.randomUUID when available)
   function makeEventId() {
     try {
       const g = globalThis as typeof globalThis & { crypto?: Crypto };
@@ -57,31 +59,31 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
     return "evt_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
   }
 
-  // Helper: try sendBeacon then fallback to keepalive fetch
   async function sendSignOutPayload(payload: Record<string, unknown>) {
     const path = "/api/log-event";
     const url =
-      typeof window !== "undefined" && window.location?.origin ? `${window.location.origin}${path}` : path;
+      typeof window !== "undefined" && window.location?.origin
+        ? `${window.location.origin}${path}`
+        : path;
     const bodyStr = JSON.stringify(payload);
 
     try {
       if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
         const blob = new Blob([bodyStr], { type: "application/json" });
         const ok = navigator.sendBeacon(url, blob);
-        if (ok) return true; // queued by browser
+        if (ok) return true;
       }
     } catch {
-      // swallow and fall back
+      // swallow
     }
 
     try {
-      // keepalive allows the request to continue while the page unloads
       await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: bodyStr,
-        keepalive: true,
-      } as RequestInit & { keepalive: boolean }); // 👈 safe cast to support keepalive
+        keepalive: true, // supported in modern browsers
+      } as RequestInit & { keepalive: boolean });
       return true;
     } catch {
       return false;
@@ -95,7 +97,8 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
 
     try {
       const lastUserId = localStorage.getItem("auth:last_seen_user_id");
-      const lastUserEmail = localStorage.getItem("last_user_email");
+      // ✅ FIX: read the canonical email key
+      const lastUserEmail = localStorage.getItem(LS_LAST_USER_EMAIL);
 
       const eventId = makeEventId();
       const payload = {
@@ -108,13 +111,22 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
       try {
         localStorage.setItem(
           "auth:last_logged",
-          JSON.stringify({ user_id: lastUserId ?? null, action: "sign_out", ts: Date.now(), event_id: eventId })
+          JSON.stringify({
+            user_id: lastUserId ?? null,
+            action: "sign_out",
+            ts: Date.now(),
+            event_id: eventId,
+          })
         );
       } catch {
         // ignore storage errors
       }
 
-      console.info("UserPill: sending sign_out log", { user_id: lastUserId, event_id: eventId });
+      console.info("UserPill: sending sign_out log", {
+        user_id: lastUserId,
+        event_id: eventId,
+        user_email: lastUserEmail,
+      });
 
       try {
         await sendSignOutPayload(payload);
@@ -122,8 +134,9 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         console.warn("Sign-out logging attempt failed:", err);
       }
 
-      // supabaseBrowser might be a factory or a client instance
-      type SupabaseClientShape = { auth?: { signOut?: (opts?: { scope?: string }) => Promise<unknown> } };
+      type SupabaseClientShape = {
+        auth?: { signOut?: (opts?: { scope?: string }) => Promise<unknown> };
+      };
       type SupabaseFactory = () => SupabaseClientShape | undefined;
 
       const supabaseClient: SupabaseClientShape | undefined = (() => {
@@ -189,7 +202,10 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
           )}
         </Avatar>
-        <span className="hidden sm:inline-block max-w-[140px] truncate" title={name || email}>
+        <span
+          className="hidden sm:inline-block max-w-[140px] truncate"
+          title={name || email}
+        >
           {name || email}
         </span>
       </DropdownMenuTrigger>
@@ -198,7 +214,10 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         <DropdownMenuLabel className="truncate" title={name || "Member"}>
           {name || "Member"}
         </DropdownMenuLabel>
-        <div className="px-2 pb-2 text-xs text-muted-foreground truncate" title={email}>
+        <div
+          className="px-2 pb-2 text-xs text-muted-foreground truncate"
+          title={email}
+        >
           {email}
         </div>
         <DropdownMenuSeparator />

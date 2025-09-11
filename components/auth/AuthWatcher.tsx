@@ -8,20 +8,18 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// LocalStorage keys
+// LocalStorage keys (single canonical key for email)
 const LS_LAST_SEEN_USER = "auth:last_seen_user_id";
 const LS_LAST_LOGGED = "auth:last_logged";
 const LS_LAST_USER_EMAIL = "auth:last_user_email";
 
 // dedupe window (ms)
 const DEDUPE_WINDOW_MS = 8000;
-
-// short-lived claim TTL (not strictly enforced server side — used for coordination)
+// claim TTL
 const CLAIM_TTL_MS = 5000;
 
 type LastLogged = { user_id: string | null; action: string; ts: number };
 
-// Cross-tab message shape (we accept extra props but these are the known ones)
 type CrossTabMessage = {
   type: "sign_in" | "sign_out";
   user_id?: string | null;
@@ -30,12 +28,10 @@ type CrossTabMessage = {
   [k: string]: unknown;
 };
 
-// Auth session minimal shape used from Supabase callbacks
 type AuthSessionShape = {
   user?: { id?: string; email?: string } | null;
 } | null;
 
-// Per-tab id (use crypto.randomUUID when available)
 const TAB_ID = (() => {
   try {
     const g = globalThis as typeof globalThis & { crypto?: Crypto & { randomUUID?: () => string } };
@@ -76,7 +72,6 @@ function saveLastLogged(entry: LastLogged) {
   } catch {}
 }
 
-// visible-tab helper
 function isTabVisible() {
   try {
     return typeof document !== "undefined" && document.visibilityState === "visible";
@@ -85,10 +80,6 @@ function isTabVisible() {
   }
 }
 
-/**
- * Claiming helper — last-writer-wins claim in localStorage.
- * payload is stored for observability; ttl controls how recent the claim must be.
- */
 function tryClaim(claimKey: string, payload: Record<string, unknown>, ttl = CLAIM_TTL_MS): boolean {
   try {
     const record = { tab: TAB_ID, ts: Date.now(), payload };
@@ -96,7 +87,6 @@ function tryClaim(claimKey: string, payload: Record<string, unknown>, ttl = CLAI
   } catch {
     return false;
   }
-
   try {
     const raw = localStorage.getItem(claimKey);
     if (!raw) return false;
@@ -108,10 +98,6 @@ function tryClaim(claimKey: string, payload: Record<string, unknown>, ttl = CLAI
   }
 }
 
-/**
- * Cross-tab notifier: BroadcastChannel preferred, storage fallback
- * onMessage receives a validated CrossTabMessage.
- */
 const CHANNEL_NAME = "auth-log-channel";
 function createNotifier(onMessage: (msg: CrossTabMessage) => void) {
   let bc: BroadcastChannel | null = null;
@@ -124,7 +110,6 @@ function createNotifier(onMessage: (msg: CrossTabMessage) => void) {
       bc.onmessage = (ev: MessageEvent) => {
         const d = ev.data;
         if (!d) return;
-        // runtime-validate and forward
         if (isCrossTabMessage(d)) onMessage(d);
       };
     } catch {
@@ -179,7 +164,6 @@ function createNotifier(onMessage: (msg: CrossTabMessage) => void) {
   };
 }
 
-// runtime type guard for CrossTabMessage
 function isCrossTabMessage(v: unknown): v is CrossTabMessage {
   if (!v || typeof v !== "object") return false;
   const t = (v as Record<string, unknown>)["type"];
@@ -190,13 +174,13 @@ export default function AuthWatcher() {
   useEffect(() => {
     const notifier = createNotifier((msg) => {
       try {
-        // msg is CrossTabMessage (validated by createNotifier)
         const { type, user_id, ts, user_email } = msg;
         const now = Date.now();
         if (type === "sign_in") {
           writeLastSeenUser(user_id ?? null);
           saveLastLogged({ user_id: user_id ?? null, action: "sign_in", ts: ts ?? now });
-          if (user_email) {
+          // ALWAYS persist user_email when provided (canonical key)
+          if (typeof user_email === "string" && user_email.length) {
             try {
               localStorage.setItem(LS_LAST_USER_EMAIL, user_email);
             } catch {}
@@ -204,18 +188,17 @@ export default function AuthWatcher() {
         } else if (type === "sign_out") {
           saveLastLogged({ user_id: user_id ?? null, action: "sign_out", ts: ts ?? now });
           writeLastSeenUser(null);
-          if (user_email) {
+          if (typeof user_email === "string" && user_email.length) {
             try {
               localStorage.setItem(LS_LAST_USER_EMAIL, user_email);
             } catch {}
           }
         }
       } catch {
-        // swallow notifier errors
+        // swallow
       }
     });
 
-    // supabase onAuthStateChange handler
     const { data: sub } = supabase.auth.onAuthStateChange(async (event: string, session: AuthSessionShape) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT") return;
       const now = Date.now();
@@ -236,40 +219,30 @@ export default function AuthWatcher() {
           return;
         }
 
-        if (
-          lastLogged &&
-          lastLogged.user_id === currentUserId &&
-          lastLogged.action === "sign_in" &&
-          now - lastLogged.ts < DEDUPE_WINDOW_MS
-        ) {
+        if (lastLogged && lastLogged.user_id === currentUserId && lastLogged.action === "sign_in" && now - lastLogged.ts < DEDUPE_WINDOW_MS) {
           writeLastSeenUser(currentUserId);
           return;
         }
 
-        // Update local markers first
+        // Update local markers
         writeLastSeenUser(currentUserId);
         try {
           if (currentUserEmail) localStorage.setItem(LS_LAST_USER_EMAIL, currentUserEmail);
         } catch {}
         saveLastLogged({ user_id: currentUserId, action: "sign_in", ts: now });
 
-        // Notify other tabs
+        // Notify other tabs (include email if present)
         try {
           notifier.send({ type: "sign_in", user_id: currentUserId, user_email: currentUserEmail, ts: now });
         } catch {}
 
-        // Coordination: prefer visible tab, then claim if multiple visible or race
+        // Coordination / claim
         const claimKey = "auth:claim_sign_in";
         const payload: Record<string, unknown> = { user_id: currentUserId, user_email: currentUserEmail, ts: now };
-
-        // If tab visible, attempt to claim and post; if not visible, attempt claim only
         const shouldAttemptPost = isTabVisible();
-
-        // try to claim — only the claimed tab performs the POST
         const claimed = tryClaim(claimKey, payload, CLAIM_TTL_MS);
 
         if (claimed && shouldAttemptPost) {
-          // we won the claim and are visible -> do network POST
           try {
             await fetch("/api/log-event", {
               method: "POST",
@@ -278,10 +251,8 @@ export default function AuthWatcher() {
             });
           } catch (err) {
             console.error("AuthWatcher: failed to post sign_in", err);
-            // even if POST fails, other tabs will know via saved markers and notifier
           }
         } else {
-          // if not claimed OR not visible, skip POST. Another tab will handle it.
           try {
             localStorage.setItem("auth:last_post_skipped_at", String(Date.now()));
           } catch {}
@@ -294,12 +265,7 @@ export default function AuthWatcher() {
       if (event === "SIGNED_OUT") {
         if (!lastSeen) return;
 
-        if (
-          lastLogged &&
-          lastLogged.user_id === lastSeen &&
-          lastLogged.action === "sign_out" &&
-          now - lastLogged.ts < DEDUPE_WINDOW_MS
-        ) {
+        if (lastLogged && lastLogged.user_id === lastSeen && lastLogged.action === "sign_out" && now - lastLogged.ts < DEDUPE_WINDOW_MS) {
           writeLastSeenUser(null);
           return;
         }
@@ -307,6 +273,7 @@ export default function AuthWatcher() {
         saveLastLogged({ user_id: lastSeen, action: "sign_out", ts: now });
         writeLastSeenUser(null);
 
+        // Read canonical stored email (set at sign-in)
         const lastEmail = (() => {
           try {
             return localStorage.getItem(LS_LAST_USER_EMAIL);
@@ -345,7 +312,6 @@ export default function AuthWatcher() {
       }
     });
 
-    // cleanup
     return () => {
       try {
         notifier.close();
