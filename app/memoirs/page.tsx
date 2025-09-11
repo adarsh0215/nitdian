@@ -31,7 +31,17 @@ function parseFilters(sp: Record<string, string | string[] | undefined>) {
   return { page };
 }
 
-type DBRow = Record<string, unknown>;
+type DBRow = {
+  id: number | string;
+  message?: string | null;
+  name?: string | null;
+  email?: string | null;
+  role_company?: string | null;
+  branch?: string | null;
+  batch?: number | string | null;
+  priority_seq?: number | null;
+  date_approved?: string | null;
+};
 
 export default async function MemoirsPage({
   searchParams,
@@ -43,10 +53,7 @@ export default async function MemoirsPage({
 
   const supabase = await supabaseServer();
 
-  // NOTE: only select columns that exist in your `memoirs` table.
-  // From your schema: id, created_at, email, message, show_on_main_page,
-  // priority_seq, name, batch, branch, role_company, date_approved, active
-  // (avatar_url is not present so we do NOT request it).
+  // Query only existing columns
   let q = supabase
     .from("memoirs")
     .select(
@@ -56,36 +63,33 @@ export default async function MemoirsPage({
     .eq("active", true)
     .not("date_approved", "is", null);
 
-  // Order: priority_seq ascending (lower = higher priority), then newest approved first
   q = q.order("priority_seq", { ascending: true }).order("date_approved", { ascending: false });
 
   const from = (page - 1) * PER_PAGE;
   const to = from + PER_PAGE - 1;
 
-  // Run query
   const { data, count, error } = await q.range(from, to);
 
-  // Defensive logging: always stringify safely so dev overlay doesn't choke on complex objects
+  // Defensive logging
   if (error) {
     try {
-      // Safely extract message if present; otherwise stringify
       let safe: string;
-      if (error && typeof error === "object" && "message" in error) {
-        // @ts-ignore - property check above ensures access
-        safe = String((error as { message?: unknown }).message ?? JSON.stringify(error));
+
+      if (typeof error === "object" && error !== null && "message" in error) {
+        const maybeMsg = (error as { message?: unknown }).message;
+        safe = typeof maybeMsg === "string" ? maybeMsg : JSON.stringify(error);
       } else {
         safe = String(error);
       }
+
       console.error("app/memoirs/page.tsx - supabase error:", safe);
     } catch {
       console.error("app/memoirs/page.tsx - supabase error (unserializable):", String(error));
     }
-    // Fail-soft: continue with empty rows so UI doesn't break
   }
 
   const rows = Array.isArray(data) ? (data as DBRow[]) : [];
 
-  // Map DB rows to frontend shape. avatar is null because memoirs table has none.
   const items = rows.map((r) => {
     const id = typeof r.id === "number" ? r.id : Number(r.id);
     const quote = typeof r.message === "string" ? r.message : String(r.message ?? "");
@@ -93,8 +97,12 @@ export default async function MemoirsPage({
       (typeof r.name === "string" && r.name) ||
       (typeof r.email === "string" && r.email) ||
       "Anonymous";
-    const role = (typeof r.role_company === "string" && r.role_company) || (typeof r.branch === "string" && r.branch) || undefined;
-    const year = typeof r.batch === "number" || typeof r.batch === "string" ? r.batch : undefined;
+    const role =
+      (typeof r.role_company === "string" && r.role_company) ||
+      (typeof r.branch === "string" && r.branch) ||
+      undefined;
+    const year =
+      typeof r.batch === "number" || typeof r.batch === "string" ? r.batch : undefined;
     const priority = typeof r.priority_seq === "number" ? r.priority_seq : null;
     const approved_at = typeof r.date_approved === "string" ? r.date_approved : null;
 
@@ -104,7 +112,7 @@ export default async function MemoirsPage({
       author,
       role,
       year,
-      avatar: null, // no avatar field in memoirs table
+      avatar: null, // no avatar in memoirs table
       priority,
       approved_at,
     };

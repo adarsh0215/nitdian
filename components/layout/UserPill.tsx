@@ -80,9 +80,8 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: bodyStr,
-        // @ts-ignore: keepalive is supported in browsers; TS may complain in some environments
         keepalive: true,
-      });
+      } as RequestInit & { keepalive: boolean }); // 👈 safe cast to support keepalive
       return true;
     } catch {
       return false;
@@ -95,23 +94,9 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
     setOpen(false);
 
     try {
-      // Read last-known user info saved by AuthWatcher
-      const lastUserId = (() => {
-        try {
-          return localStorage.getItem("auth:last_seen_user_id");
-        } catch {
-          return null;
-        }
-      })();
-      const lastUserEmail = (() => {
-        try {
-          return localStorage.getItem("last_user_email");
-        } catch {
-          return null;
-        }
-      })();
+      const lastUserId = localStorage.getItem("auth:last_seen_user_id");
+      const lastUserEmail = localStorage.getItem("last_user_email");
 
-      // generate event id and include it in the payload & local marker
       const eventId = makeEventId();
       const payload = {
         user_id: lastUserId ?? null,
@@ -120,7 +105,6 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         event_id: eventId,
       };
 
-      // MARK: set auth:last_logged so AuthWatcher dedupe will skip the follow-up SIGNED_OUT post
       try {
         localStorage.setItem(
           "auth:last_logged",
@@ -130,45 +114,35 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         // ignore storage errors
       }
 
-      // Debug: small console info so you can trace duplicates (remove in prod if desired)
       console.info("UserPill: sending sign_out log", { user_id: lastUserId, event_id: eventId });
 
-      // Try to enqueue sign-out log before actually signing out
       try {
         await sendSignOutPayload(payload);
       } catch (err) {
-        // log and continue
         console.warn("Sign-out logging attempt failed:", err);
       }
 
-      // Now proceed with sign-out steps (preserve your previous behavior)
-      // supabaseBrowser might be exported as a function (factory) or a client instance; handle both safely
-
-      // Precise local types describing what we need
+      // supabaseBrowser might be a factory or a client instance
       type SupabaseClientShape = { auth?: { signOut?: (opts?: { scope?: string }) => Promise<unknown> } };
       type SupabaseFactory = () => SupabaseClientShape | undefined;
 
-      const supabaseClient = (() => {
+      const supabaseClient: SupabaseClientShape | undefined = (() => {
         try {
-          const sb = supabaseBrowser as unknown;
-          if (typeof sb === "function") {
-            const fn = sb as SupabaseFactory;
-            return fn();
+          if (typeof supabaseBrowser === "function") {
+            return (supabaseBrowser as SupabaseFactory)();
           }
-          return sb as SupabaseClientShape | undefined;
+          return supabaseBrowser as SupabaseClientShape | undefined;
         } catch {
           return undefined;
         }
       })();
 
-      // 1) Clear local client session immediately so UI flips
       try {
         await supabaseClient?.auth?.signOut?.({ scope: "local" });
       } catch (err) {
         console.warn("local signOut failed:", err);
       }
 
-      // 2) Clear server cookies (and optionally revoke tokens)
       try {
         await Promise.allSettled([
           supabaseClient?.auth?.signOut?.({ scope: "global" }),
@@ -182,14 +156,13 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         console.warn("global signOut or server callback failed:", err);
       }
 
-      // 3) HARD redirect to avoid App Router/RSC caching quirks
       window.location.replace("/login");
     } catch (err) {
       console.error("Sign out failed, redirecting anyway:", err);
       try {
         window.location.replace("/login");
       } catch {
-        // final fallback: do nothing
+        // final fallback
       }
     } finally {
       setSigningOut(false);
