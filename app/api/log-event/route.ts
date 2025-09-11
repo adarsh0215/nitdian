@@ -2,22 +2,29 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("log-event: missing SUPABASE env vars");
-}
-
-const supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-});
-
-// dedupe window in milliseconds
 const DEDUPE_MS = 15_000;
 const ALLOWED_ACTIONS = new Set(["sign_in", "sign_out", "sign_up"]);
 
+function getEnvVar(name: string | undefined): string | null {
+  return name && name.length ? name : null;
+}
+
 export async function POST(req: Request) {
+  // Lazy-read envs so we don't crash at module-eval / build time
+  const SUPABASE_URL = getEnvVar(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const SUPABASE_SERVICE_ROLE_KEY = getEnvVar(process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    // Log minimal info (no secrets)
+    console.error("log-event: missing SUPABASE env vars");
+    return NextResponse.json({ error: "Server misconfigured: missing supabase key" }, { status: 500 });
+  }
+
+  // Create server client here (request-time)
+  const supabaseServer = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  });
+
   try {
     const body = await req.json().catch(() => ({}));
     const { user_id = null, user_email = null, action } = body as {
@@ -45,7 +52,7 @@ export async function POST(req: Request) {
         .limit(1);
 
       if (error) {
-        console.error("log-event: select error (user_id)", error);
+        console.error("log-event: select error (user_id)", error?.message ?? error);
       } else if (data && data.length > 0) {
         duplicateFound = true;
       }
@@ -59,7 +66,7 @@ export async function POST(req: Request) {
         .limit(1);
 
       if (error) {
-        console.error("log-event: select error (user_email)", error);
+        console.error("log-event: select error (user_email)", error?.message ?? error);
       } else if (data && data.length > 0) {
         duplicateFound = true;
       }
@@ -77,11 +84,11 @@ export async function POST(req: Request) {
       .limit(1);
 
     if (insertError) {
-      console.error("log-event: insert error", insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      console.error("log-event: insert error", insertError?.message ?? insertError);
+      return NextResponse.json({ error: String(insertError?.message ?? "insert failed") }, { status: 500 });
     }
 
-    const insertedId = Array.isArray(insertData) && insertData.length > 0 ? insertData[0].id ?? null : null;
+    const insertedId = Array.isArray(insertData) && insertData.length > 0 ? (insertData[0] as any).id ?? null : null;
     return NextResponse.json({ success: true, skipped: false, id: insertedId }, { status: 201 });
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
