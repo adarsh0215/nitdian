@@ -47,19 +47,21 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
   // generate small event id (uses crypto.randomUUID when available)
   function makeEventId() {
     try {
-      // @ts-ignore
-      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-        // @ts-ignore
-        return crypto.randomUUID();
+      const g = globalThis as typeof globalThis & { crypto?: Crypto };
+      if (g.crypto?.randomUUID) {
+        return g.crypto.randomUUID();
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
     return "evt_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
   }
 
   // Helper: try sendBeacon then fallback to keepalive fetch
-  async function sendSignOutPayload(payload: Record<string, any>) {
+  async function sendSignOutPayload(payload: Record<string, unknown>) {
     const path = "/api/log-event";
-    const url = (typeof window !== "undefined" && window.location?.origin) ? `${window.location.origin}${path}` : path;
+    const url =
+      typeof window !== "undefined" && window.location?.origin ? `${window.location.origin}${path}` : path;
     const bodyStr = JSON.stringify(payload);
 
     try {
@@ -68,7 +70,7 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         const ok = navigator.sendBeacon(url, blob);
         if (ok) return true; // queued by browser
       }
-    } catch (e) {
+    } catch {
       // swallow and fall back
     }
 
@@ -78,10 +80,11 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: bodyStr,
+        // @ts-ignore: keepalive is supported in browsers; TS may complain in some environments
         keepalive: true,
       });
       return true;
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -95,7 +98,6 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
       // Read last-known user info saved by AuthWatcher
       const lastUserId = (() => {
         try {
-          // FIXED: use the same key AuthWatcher uses: "auth:last_seen_user_id"
           return localStorage.getItem("auth:last_seen_user_id");
         } catch {
           return null;
@@ -111,16 +113,20 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
 
       // generate event id and include it in the payload & local marker
       const eventId = makeEventId();
-      const payload = { user_id: lastUserId ?? null, user_email: lastUserEmail ?? null, action: "sign_out", event_id: eventId };
+      const payload = {
+        user_id: lastUserId ?? null,
+        user_email: lastUserEmail ?? null,
+        action: "sign_out",
+        event_id: eventId,
+      };
 
       // MARK: set auth:last_logged so AuthWatcher dedupe will skip the follow-up SIGNED_OUT post
       try {
-        // include event_id here as additional optional field (AuthWatcher will ignore unknown fields)
         localStorage.setItem(
           "auth:last_logged",
           JSON.stringify({ user_id: lastUserId ?? null, action: "sign_out", ts: Date.now(), event_id: eventId })
         );
-      } catch (e) {
+      } catch {
         // ignore storage errors
       }
 
@@ -130,37 +136,41 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
       // Try to enqueue sign-out log before actually signing out
       try {
         await sendSignOutPayload(payload);
-      } catch (e) {
-        // ignore — we'll still sign out
-        console.warn("Sign-out logging attempt failed:", e);
+      } catch (err) {
+        // log and continue
+        console.warn("Sign-out logging attempt failed:", err);
       }
 
       // Now proceed with sign-out steps (preserve your previous behavior)
       // supabaseBrowser might be exported as a function (factory) or a client instance; handle both safely
+
+      // Precise local types describing what we need
+      type SupabaseClientShape = { auth?: { signOut?: (opts?: { scope?: string }) => Promise<unknown> } };
+      type SupabaseFactory = () => SupabaseClientShape | undefined;
+
       const supabaseClient = (() => {
         try {
-          // @ts-ignore
-          if (typeof supabaseBrowser === "function") return supabaseBrowser();
-          // @ts-ignore
-          return supabaseBrowser;
+          const sb = supabaseBrowser as unknown;
+          if (typeof sb === "function") {
+            const fn = sb as SupabaseFactory;
+            return fn();
+          }
+          return sb as SupabaseClientShape | undefined;
         } catch {
-          // fallback: try using it as instance
-          // @ts-ignore
-          return supabaseBrowser;
+          return undefined;
         }
       })();
 
       // 1) Clear local client session immediately so UI flips
       try {
         await supabaseClient?.auth?.signOut?.({ scope: "local" });
-      } catch (e) {
-        console.warn("local signOut failed:", e);
+      } catch (err) {
+        console.warn("local signOut failed:", err);
       }
 
       // 2) Clear server cookies (and optionally revoke tokens)
       try {
         await Promise.allSettled([
-          // revoke tokens across devices if you want (safe to keep or remove)
           supabaseClient?.auth?.signOut?.({ scope: "global" }),
           fetch("/auth/callback/signout", {
             method: "POST",
@@ -168,8 +178,8 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
             cache: "no-store",
           }),
         ]);
-      } catch (e) {
-        console.warn("global signOut or server callback failed:", e);
+      } catch (err) {
+        console.warn("global signOut or server callback failed:", err);
       }
 
       // 3) HARD redirect to avoid App Router/RSC caching quirks

@@ -67,7 +67,7 @@ export async function supabaseServer() {
           expires: mapped.expires,
           httpOnly: mapped.httpOnly,
           secure: mapped.secure,
-          sameSite: mapped.sameSite as any,
+          sameSite: mapped.sameSite as NextCookieOptions["sameSite"],
         });
       },
 
@@ -83,7 +83,7 @@ export async function supabaseServer() {
           expires: new Date(0),
           httpOnly: base.httpOnly,
           secure: base.secure,
-          sameSite: base.sameSite as any,
+          sameSite: base.sameSite as NextCookieOptions["sameSite"],
         });
       },
     },

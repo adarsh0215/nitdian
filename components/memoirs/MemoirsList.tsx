@@ -13,8 +13,6 @@ import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-type ApiRaw = any;
-
 type MemoirCard = {
   id: number;
   quote: string;
@@ -58,7 +56,7 @@ function MemoirsListWithPagination({ initial }: { initial: MemoirsInitial }) {
 
   function onChangeFilters(next: { page: number }) {
     setBusy(true);
-    const sp = new URLSearchParams(Array.from(searchParams.entries()));
+    const sp = new URLSearchParams(Array.from(searchParams?.entries() ?? []));
     sp.set("page", String(next.page));
     router.push(`${window.location.pathname}?${sp.toString()}`);
     setTimeout(() => setBusy(false), 500); // brief busy state
@@ -96,9 +94,7 @@ function MemoirsListWithPagination({ initial }: { initial: MemoirsInitial }) {
         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
           Loved by Alumni across Batches
         </h2>
-        <p className="mt-2 text-muted-foreground">
-          Appreciation, Motivation, and Encouragement.
-        </p>
+        <p className="mt-2 text-muted-foreground">Appreciation, Motivation, and Encouragement.</p>
       </div>
 
       {/* Pagination (top) */}
@@ -135,10 +131,7 @@ function MemoirCard({ item }: { item: MemoirCard }) {
     const compute = () => {
       const cs = getComputedStyle(el);
       const fs = parseFloat(cs.fontSize || "16");
-      const lh =
-        cs.lineHeight === "normal" || !cs.lineHeight
-          ? 1.5 * fs
-          : parseFloat(cs.lineHeight);
+      const lh = cs.lineHeight === "normal" || !cs.lineHeight ? 1.5 * fs : parseFloat(cs.lineHeight);
       const max = Math.round(lh * 5 + 2);
       setCollapsedMax(max);
       setContentHeight(el.scrollHeight);
@@ -168,17 +161,11 @@ function MemoirCard({ item }: { item: MemoirCard }) {
           }}
           className="text-sm sm:text-base leading-relaxed break-words whitespace-pre-line"
         >
-          <span
-            aria-hidden
-            className="mr-1 text-xl inline-block select-none text-primary"
-          >
+          <span aria-hidden className="mr-1 text-xl inline-block select-none text-primary">
             “
           </span>
           {item.quote}
-          <span
-            aria-hidden
-            className="ml-1 text-xl inline-block select-none text-primary"
-          >
+          <span aria-hidden className="ml-1 text-xl inline-block select-none text-primary">
             ”
           </span>
         </div>
@@ -204,27 +191,13 @@ function MemoirCard({ item }: { item: MemoirCard }) {
 
       <div className="mt-auto pt-4 border-t border-border/70 flex items-center gap-3">
         <Avatar className="h-10 w-10 bg-muted ring-2 ring-background">
-          {item.avatar ? (
-            <AvatarImage src={item.avatar} alt={item.author} />
-          ) : null}
-          <AvatarFallback className="text-xs font-medium">
-            {initials(item.author)}
-          </AvatarFallback>
+          {item.avatar ? <AvatarImage src={item.avatar} alt={item.author} /> : null}
+          <AvatarFallback className="text-xs font-medium">{initials(item.author)}</AvatarFallback>
         </Avatar>
         <div className="min-w-0">
-          <div className="text-[15px] sm:text-base font-semibold leading-tight truncate">
-            {item.author}
-          </div>
-          {item.role && (
-            <div className="text-sm text-muted-foreground leading-tight truncate">
-              {item.role}
-            </div>
-          )}
-          {item.year && (
-            <div className="text-sm text-muted-foreground/90 leading-tight truncate">
-              {item.year}
-            </div>
-          )}
+          <div className="text-[15px] sm:text-base font-semibold leading-tight truncate">{item.author}</div>
+          {item.role && <div className="text-sm text-muted-foreground leading-tight truncate">{item.role}</div>}
+          {item.year && <div className="text-sm text-muted-foreground/90 leading-tight truncate">{item.year}</div>}
         </div>
       </div>
     </article>

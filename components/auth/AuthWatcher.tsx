@@ -21,10 +21,25 @@ const CLAIM_TTL_MS = 5000;
 
 type LastLogged = { user_id: string | null; action: string; ts: number };
 
-// Per-tab id
+// Cross-tab message shape (we accept extra props but these are the known ones)
+type CrossTabMessage = {
+  type: "sign_in" | "sign_out";
+  user_id?: string | null;
+  user_email?: string | null;
+  ts?: number;
+  [k: string]: unknown;
+};
+
+// Auth session minimal shape used from Supabase callbacks
+type AuthSessionShape = {
+  user?: { id?: string; email?: string } | null;
+} | null;
+
+// Per-tab id (use crypto.randomUUID when available)
 const TAB_ID = (() => {
   try {
-    if (typeof crypto !== "undefined" && (crypto as any).randomUUID) return (crypto as any).randomUUID();
+    const g = globalThis as typeof globalThis & { crypto?: Crypto & { randomUUID?: () => string } };
+    if (g.crypto?.randomUUID) return g.crypto.randomUUID();
     return `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
   } catch {
     return `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
@@ -72,9 +87,9 @@ function isTabVisible() {
 
 /**
  * Claiming helper — last-writer-wins claim in localStorage.
- * Returns true when this tab "owns" the claim (i.e. wrote and read back its TAB_ID).
+ * payload is stored for observability; ttl controls how recent the claim must be.
  */
-function tryClaim(claimKey: string, payload: object, ttl = CLAIM_TTL_MS): boolean {
+function tryClaim(claimKey: string, payload: Record<string, unknown>, ttl = CLAIM_TTL_MS): boolean {
   try {
     const record = { tab: TAB_ID, ts: Date.now(), payload };
     localStorage.setItem(claimKey, JSON.stringify(record));
@@ -82,12 +97,10 @@ function tryClaim(claimKey: string, payload: object, ttl = CLAIM_TTL_MS): boolea
     return false;
   }
 
-  // read back synchronously
   try {
     const raw = localStorage.getItem(claimKey);
     if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    // If the stored record belongs to us and is recent, we "won"
+    const parsed = JSON.parse(raw) as { tab?: string; ts?: number } | null;
     if (parsed && parsed.tab === TAB_ID && Date.now() - (parsed.ts ?? 0) < ttl) return true;
     return false;
   } catch {
@@ -97,9 +110,10 @@ function tryClaim(claimKey: string, payload: object, ttl = CLAIM_TTL_MS): boolea
 
 /**
  * Cross-tab notifier: BroadcastChannel preferred, storage fallback
+ * onMessage receives a validated CrossTabMessage.
  */
 const CHANNEL_NAME = "auth-log-channel";
-function createNotifier(onMessage: (msg: any) => void) {
+function createNotifier(onMessage: (msg: CrossTabMessage) => void) {
   let bc: BroadcastChannel | null = null;
   const fallbackKey = "auth-log-fallback";
   const fallbackCleanupKey = "auth-log-fallback-cleanup";
@@ -107,9 +121,11 @@ function createNotifier(onMessage: (msg: any) => void) {
   if (typeof window !== "undefined" && "BroadcastChannel" in window) {
     try {
       bc = new BroadcastChannel(CHANNEL_NAME);
-      bc.onmessage = (ev) => {
-        if (!ev?.data) return;
-        onMessage(ev.data);
+      bc.onmessage = (ev: MessageEvent) => {
+        const d = ev.data;
+        if (!d) return;
+        // runtime-validate and forward
+        if (isCrossTabMessage(d)) onMessage(d);
       };
     } catch {
       bc = null;
@@ -119,8 +135,8 @@ function createNotifier(onMessage: (msg: any) => void) {
   function storageListener(e: StorageEvent) {
     if (e.key === fallbackKey && e.newValue) {
       try {
-        const data = JSON.parse(e.newValue);
-        onMessage(data);
+        const parsed = JSON.parse(e.newValue);
+        if (isCrossTabMessage(parsed)) onMessage(parsed);
       } catch {}
     }
   }
@@ -129,7 +145,7 @@ function createNotifier(onMessage: (msg: any) => void) {
     window.addEventListener("storage", storageListener);
   }
 
-  function send(msg: object) {
+  function send(msg: Record<string, unknown>) {
     if (bc) {
       try {
         bc.postMessage(msg);
@@ -163,11 +179,19 @@ function createNotifier(onMessage: (msg: any) => void) {
   };
 }
 
+// runtime type guard for CrossTabMessage
+function isCrossTabMessage(v: unknown): v is CrossTabMessage {
+  if (!v || typeof v !== "object") return false;
+  const t = (v as Record<string, unknown>)["type"];
+  return t === "sign_in" || t === "sign_out";
+}
+
 export default function AuthWatcher() {
   useEffect(() => {
     const notifier = createNotifier((msg) => {
       try {
-        const { type, user_id, ts, user_email } = msg as any;
+        // msg is CrossTabMessage (validated by createNotifier)
+        const { type, user_id, ts, user_email } = msg;
         const now = Date.now();
         if (type === "sign_in") {
           writeLastSeenUser(user_id ?? null);
@@ -186,10 +210,13 @@ export default function AuthWatcher() {
             } catch {}
           }
         }
-      } catch {}
+      } catch {
+        // swallow notifier errors
+      }
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // supabase onAuthStateChange handler
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event: string, session: AuthSessionShape) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT") return;
       const now = Date.now();
 
@@ -209,7 +236,12 @@ export default function AuthWatcher() {
           return;
         }
 
-        if (lastLogged && lastLogged.user_id === currentUserId && lastLogged.action === "sign_in" && now - lastLogged.ts < DEDUPE_WINDOW_MS) {
+        if (
+          lastLogged &&
+          lastLogged.user_id === currentUserId &&
+          lastLogged.action === "sign_in" &&
+          now - lastLogged.ts < DEDUPE_WINDOW_MS
+        ) {
           writeLastSeenUser(currentUserId);
           return;
         }
@@ -228,9 +260,9 @@ export default function AuthWatcher() {
 
         // Coordination: prefer visible tab, then claim if multiple visible or race
         const claimKey = "auth:claim_sign_in";
-        const payload = { user_id: currentUserId, user_email: currentUserEmail, ts: now };
+        const payload: Record<string, unknown> = { user_id: currentUserId, user_email: currentUserEmail, ts: now };
 
-        // If tab visible, attempt to claim and post; if not visible, attempt claim only (so a background tab can still win if visible check is unreliable)
+        // If tab visible, attempt to claim and post; if not visible, attempt claim only
         const shouldAttemptPost = isTabVisible();
 
         // try to claim — only the claimed tab performs the POST
@@ -262,7 +294,12 @@ export default function AuthWatcher() {
       if (event === "SIGNED_OUT") {
         if (!lastSeen) return;
 
-        if (lastLogged && lastLogged.user_id === lastSeen && lastLogged.action === "sign_out" && now - lastLogged.ts < DEDUPE_WINDOW_MS) {
+        if (
+          lastLogged &&
+          lastLogged.user_id === lastSeen &&
+          lastLogged.action === "sign_out" &&
+          now - lastLogged.ts < DEDUPE_WINDOW_MS
+        ) {
           writeLastSeenUser(null);
           return;
         }
@@ -283,7 +320,7 @@ export default function AuthWatcher() {
         } catch {}
 
         const claimKey = "auth:claim_sign_out";
-        const payload = { user_id: lastSeen, user_email: lastEmail, ts: now };
+        const payload: Record<string, unknown> = { user_id: lastSeen, user_email: lastEmail, ts: now };
 
         const shouldAttemptPost = isTabVisible();
         const claimed = tryClaim(claimKey, payload, CLAIM_TTL_MS);

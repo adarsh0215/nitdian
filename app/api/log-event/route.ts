@@ -83,8 +83,9 @@ export async function POST(req: Request) {
 
     const insertedId = Array.isArray(insertData) && insertData.length > 0 ? insertData[0].id ?? null : null;
     return NextResponse.json({ success: true, skipped: false, id: insertedId }, { status: 201 });
-  } catch (err: any) {
-    console.error("log-event: unhandled error", err);
-    return NextResponse.json({ error: err?.message || "internal" }, { status: 500 });
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("log-event: unhandled error", errMsg);
+    return NextResponse.json({ error: errMsg || "internal" }, { status: 500 });
   }
 }

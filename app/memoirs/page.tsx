@@ -31,6 +31,8 @@ function parseFilters(sp: Record<string, string | string[] | undefined>) {
   return { page };
 }
 
+type DBRow = Record<string, unknown>;
+
 export default async function MemoirsPage({
   searchParams,
 }: {
@@ -66,8 +68,14 @@ export default async function MemoirsPage({
   // Defensive logging: always stringify safely so dev overlay doesn't choke on complex objects
   if (error) {
     try {
-      const safe =
-        typeof error === "string" ? error : (error as any)?.message ?? JSON.stringify(error);
+      // Safely extract message if present; otherwise stringify
+      let safe: string;
+      if (error && typeof error === "object" && "message" in error) {
+        // @ts-ignore - property check above ensures access
+        safe = String((error as { message?: unknown }).message ?? JSON.stringify(error));
+      } else {
+        safe = String(error);
+      }
       console.error("app/memoirs/page.tsx - supabase error:", safe);
     } catch {
       console.error("app/memoirs/page.tsx - supabase error (unserializable):", String(error));
@@ -75,23 +83,36 @@ export default async function MemoirsPage({
     // Fail-soft: continue with empty rows so UI doesn't break
   }
 
-  const rows = Array.isArray(data) ? data : [];
+  const rows = Array.isArray(data) ? (data as DBRow[]) : [];
 
   // Map DB rows to frontend shape. avatar is null because memoirs table has none.
-  const items = rows.map((r: any) => ({
-    id: r.id,
-    quote: r.message ?? "",
-    author: r.name ?? r.email ?? "Anonymous",
-    role: r.role_company ?? r.branch ?? undefined,
-    year: r.batch ?? undefined,
-    avatar: null, // no avatar field in memoirs table
-    priority: r.priority_seq ?? null,
-    approved_at: r.date_approved ?? null,
-  }));
+  const items = rows.map((r) => {
+    const id = typeof r.id === "number" ? r.id : Number(r.id);
+    const quote = typeof r.message === "string" ? r.message : String(r.message ?? "");
+    const author =
+      (typeof r.name === "string" && r.name) ||
+      (typeof r.email === "string" && r.email) ||
+      "Anonymous";
+    const role = (typeof r.role_company === "string" && r.role_company) || (typeof r.branch === "string" && r.branch) || undefined;
+    const year = typeof r.batch === "number" || typeof r.batch === "string" ? r.batch : undefined;
+    const priority = typeof r.priority_seq === "number" ? r.priority_seq : null;
+    const approved_at = typeof r.date_approved === "string" ? r.date_approved : null;
+
+    return {
+      id: Number.isFinite(Number(id)) ? Number(id) : 0,
+      quote,
+      author,
+      role,
+      year,
+      avatar: null, // no avatar field in memoirs table
+      priority,
+      approved_at,
+    };
+  });
 
   const initial = {
     items,
-    total: (typeof count === "number" && Number.isFinite(count)) ? count : 0,
+    total: typeof count === "number" && Number.isFinite(count) ? count : 0,
     perPage: PER_PAGE,
     filters: { page },
   };
