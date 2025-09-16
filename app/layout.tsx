@@ -4,6 +4,8 @@ import "./globals.css";
 import { ThemeProvider } from "@/app/providers";
 import NavbarServer from "@/components/layout/NavbarServer";
 import AuthWatcher from "@/components/auth/AuthWatcher";
+import { Toaster } from "sonner";
+
 
 
 const geistSans = Geist({
@@ -35,6 +37,7 @@ export default function RootLayout({
           <AuthWatcher />
           <NavbarServer />
           {children}
+          <Toaster richColors position="top-right" /> {/* 👈 Needed */}
         </ThemeProvider>
       </body>
     </html>

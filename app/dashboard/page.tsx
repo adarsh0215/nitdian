@@ -1,7 +1,8 @@
 // app/dashboard/page.tsx
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { supabaseServer } from "@/lib/supabase/server";
+import { supabaseServer } from "@/lib/supabase/server"; // server-side supabase that uses cookies()
+import supabaseAdmin from "@/lib/supabase/admin"; // admin client (service role / anon) used for db reads
 import { Button } from "@/components/ui/button";
 import Section from "@/components/dashboard/ui/Section";
 import SuggestionCard from "@/components/dashboard/SuggestionCard";
@@ -10,28 +11,40 @@ import ProfileCompletionCard from "@/components/dashboard/ProfileCompletionCard"
 import { AlertCircle } from "lucide-react";
 import EventSection from "@/components/home/EventSection"; // <- new import
 
+// Pending list client component (client-side) that accepts `initialPending` prop.
+// Make sure this file exists at components/PendingListClient.tsx
+import PendingListClient from "@/components/PendingListClient";
+
+
 export default async function DashboardPage() {
+
+  
+  // -------------- authenticate user (server-side) ----------------
   const sb = await supabaseServer();
   const {
     data: { user },
   } = await sb.auth.getUser();
+
+  // if not signed in redirect to login
   if (!user) redirect("/login");
 
-  // parallel fetch
+  // ------------------ load viewer's profile (server-side) ----------------
+  // We fetch the logged-in user's profile to build dashboard content
   const profilePromise = sb
     .from("profiles")
     .select(
-      "id, full_name, onboarded, is_approved, is_public, degree, branch, city, country, graduation_year, company, designation, interests, avatar_url"
+      "id, full_name, onboarded, is_approved, is_public, degree, branch, city, country, graduation_year, company, designation, interests, avatar_url, email"
     )
     .eq("id", user.id)
     .maybeSingle();
 
+  // run parallel reads
   const [{ data: profile }] = await Promise.all([profilePromise]);
 
   if (!profile?.onboarded) redirect("/onboarding");
   const isApproved = !!profile?.is_approved;
 
-  // ---- Suggestions: strict AND filters, exclude self ----
+  // ---------------- Suggestions & batchmates (existing code) ----------------
   let sQuery = sb
     .from("profiles")
     .select("id, full_name, avatar_url, branch, graduation_year, company")
@@ -43,8 +56,8 @@ export default async function DashboardPage() {
     sQuery = sQuery.eq("graduation_year", profile.graduation_year);
 
   const { data: strictMatches } = await sQuery;
-
   let suggestions = strictMatches ?? [];
+
   if (suggestions.length === 0) {
     const { data: yearOnly } = await sb
       .from("profiles")
@@ -70,6 +83,117 @@ export default async function DashboardPage() {
     .neq("id", user.id)
     .eq("graduation_year", profile?.graduation_year ?? -1);
 
+  // ------------------- NEW: compute pending approvals to show ------------------
+  // We want server-side logic to only return profiles the approver is allowed to act on
+  // Steps:
+  // 1) Load approver's active memberships from member_memberships table (using admin client)
+  // 2) Load privileges for those membership_types from membership_privilege
+  // 3) If user has APPROVE_ONBOARD_ALL.execute => return all pending profiles
+  // 4) Else if user has APPROVE_ONBOARD_BATCH.execute => return pending profiles for same graduation_year
+  // 5) Else return empty list (no permissions)
+
+  // NOTE: We use supabaseAdmin (service role or anon depending on config) for reading these tables.
+  // supabaseServer was only used for authentication (reading the cookie-secured session).
+  let initialPending: any[] = [];
+
+  try {
+    // 1) fetch active memberships for this approver (user.email should exist)
+    const approverEmail = profile?.email ?? user.email ?? null;
+
+    if (approverEmail) {
+      // pull recent memberships for this user_email that are currently active (approximate filtering)
+      const nowISO = new Date().toISOString();
+      const { data: memberships, error: memErr } = await supabaseAdmin
+        .from("member_memberships")
+        .select("membership_type, start_date, end_date, params")
+        .eq("user_email", approverEmail)
+        .limit(500);
+
+      if (memErr) {
+        // log and continue — fallback: no pending shown
+        console.error("/dashboard: membership lookup error:", memErr);
+      } else {
+        // filter to memberships that are currently active (start_date <= now && (end_date is null or end_date >= now))
+        const activeMemberships = (memberships || []).filter((m: any) => {
+          try {
+            const startsOk = !m.start_date || new Date(m.start_date).toISOString() <= nowISO;
+            const endsOk = !m.end_date || new Date(m.end_date).toISOString() >= nowISO;
+            return startsOk && endsOk;
+          } catch {
+            return false;
+          }
+        });
+
+        const membershipTypes = Array.from(new Set(activeMemberships.map((m: any) => m.membership_type))).filter(Boolean);
+
+        if (membershipTypes.length > 0) {
+          // 2) fetch privileges for these membership_types
+          const { data: privileges, error: privErr } = await supabaseAdmin
+            .from("membership_privilege")
+            .select("membership_type, privilege, execute")
+            .in("membership_type", membershipTypes)
+            .limit(500);
+
+          if (privErr) {
+            console.error("/dashboard: privileges lookup error:", privErr);
+          } else {
+            const hasApproveAll = (privileges || []).some((p: any) => p.privilege === "APPROVE_ONBOARD_ALL" && p.execute);
+            const hasApproveBatch = (privileges || []).some((p: any) => p.privilege === "APPROVE_ONBOARD_BATCH" && p.execute);
+
+            if (hasApproveAll) {
+              // return top N pending profiles (all)
+              const { data: pendingAll, error: pErr } = await supabaseAdmin
+                .from("profiles")
+                .select("id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company")
+                .eq("status", "PENDING")
+                .eq("is_approved", false)
+                .limit(50)
+                .order("created_at", { ascending: false });
+
+              if (pErr) {
+                console.error("/dashboard: fetch pending all error:", pErr);
+              } else {
+                initialPending = pendingAll ?? [];
+              }
+            } else if (hasApproveBatch) {
+              // approver can approve only their batch: use approver's graduation_year (from profiles)
+              const approverYear = profile?.graduation_year ?? null;
+              if (approverYear !== null && approverYear !== undefined) {
+                const { data: pendingBatch, error: pErr } = await supabaseAdmin
+                  .from("profiles")
+                  .select("id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company")
+                  .eq("status", "PENDING")
+                  .eq("is_approved", false)
+                  .eq("graduation_year", approverYear)
+                  .limit(50)
+                  .order("created_at", { ascending: false });
+
+                if (pErr) {
+                  console.error("/dashboard: fetch pending batch error:", pErr);
+                } else {
+                  initialPending = pendingBatch ?? [];
+                }
+              } else {
+                // no approver year known -> no batch items
+                initialPending = [];
+              }
+            } else {
+              // no privileges to approve -> show empty
+              initialPending = [];
+            }
+          }
+        } else {
+          // no active memberships -> no pending approvals shown
+          initialPending = [];
+        }
+      }
+    }
+  } catch (e) {
+    console.error("/dashboard: error preparing pending list:", e);
+    initialPending = []; // fail safe
+  }
+
+  // ---------------------- render dashboard --------------------------
   return (
     <main className="mx-auto max-w-6xl p-6 space-y-6">
       {!isApproved ? (
@@ -79,26 +203,20 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      {/* Responsive 2-column grid on large screens, single column on mobile.
-          items-stretch ensures both cards have consistent height. */}
+      {/* Responsive 2-column grid on large screens, single column on mobile */}
       <div className="grid gap-6 lg:grid-cols-2 items-stretch">
         <div className="h-full">
           <EventSection
             title="Shri Shankracharya Ji Maharaj at NIT Durgapur"
             subtitle="Motivational Speech on "
-            dates={[
-              { date: "10 Sept 2025", times: "  5:00 PM" },
-              
-            ]}
+            dates={[{ date: "10 Sept 2025", times: "  5:00 PM" }]}
             ctaHref="https://www.youtube.com/live/RQ1jRAJV1fg"
             ctaLabel="Watch live"
-            
           />
         </div>
 
         <div className="h-full">
           <ProfileCard profile={profile} />
-          {/* {essentialsMissing ? <ProfileCompletionCard profile={profile} /> : null} */}
         </div>
       </div>
 
@@ -106,9 +224,7 @@ export default async function DashboardPage() {
         <div className="grid gap-6">
           <div className="space-y-4 lg:col-span-2">
             <Section
-              title={`My Batchmates${
-                typeof batchmateCount === "number" ? ` (${batchmateCount})` : ""
-              }`}
+              title={`My Batchmates${typeof batchmateCount === "number" ? ` (${batchmateCount})` : ""}`}
               cta={
                 <Button asChild size="sm" variant="outline">
                   <Link href="/directory">Open directory for Details</Link>
@@ -116,10 +232,7 @@ export default async function DashboardPage() {
               }
             >
               {cleanSuggestions.length > 0 ? (
-                <ul
-                  className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3"
-                  role="list"
-                >
+                <ul className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3" role="list">
                   {cleanSuggestions.map((p) => (
                     <li key={p.id}>
                       <SuggestionCard
@@ -141,6 +254,21 @@ export default async function DashboardPage() {
           </div>
         </div>
       ) : null}
+
+      {/* ---------- NEW: Pending Approvals Section (only for approvers) ---------- */}
+      {/* ---------- NEW: Pending Approvals Section (only for approvers) ---------- */}
+{initialPending.length > 0 ? (
+  <div className="space-y-4 lg:col-span-2">
+    <Section
+      title={`Pending Approvals (${initialPending.length})`}
+      cta={null}
+    >
+      {/* Pass server-side fetched list as initialPending */}
+      <PendingListClient initialPending={initialPending} />
+    </Section>
+  </div>
+) : null}
+
     </main>
   );
 }

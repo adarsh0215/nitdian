@@ -42,7 +42,7 @@ function writeCookie(name: string, value: string, options?: CookieOptions) {
   if (typeof document === "undefined") return;
 
   const parts: string[] = [
-    `${name}=${encodeURIComponent(value)}`,
+    `${name}=${value}`,
     `Path=${options?.path ?? "/"}`,
   ];
 
