@@ -29,6 +29,10 @@ type ProfileRow = {
   is_approved?: boolean | null;
 };
 
+/** Supabase storage helper result types (v2 shape) */
+type GetPublicUrlResult = { data: { publicUrl: string } | null; error: unknown };
+type CreateSignedUrlResult = { data: { signedUrl: string | null } | null; error: unknown };
+
 /** Safely parse JSON; returns null on failure */
 function safeParseJSON<T = unknown>(value: unknown): T | null {
   if (value === null || value === undefined || value === "") return null;
@@ -62,16 +66,22 @@ async function resolveAvatarPublicUrl(avatarValue?: string | null) {
   const bucketName = "avatars";
 
   try {
-    // getPublicUrl may return { data: { publicUrl: string }, error: null } (v2)
-    const publicRes = supabaseAdmin.storage.from(bucketName).getPublicUrl(avatarValue);
-    const publicUrlCandidate = isObject(publicRes) ? (publicRes as any)?.data?.publicUrl : null;
+    // getPublicUrl (sync)
+    const publicRes = supabaseAdmin.storage
+      .from(bucketName)
+      .getPublicUrl(avatarValue) as GetPublicUrlResult;
+
+    const publicUrlCandidate = publicRes?.data?.publicUrl ?? null;
     if (typeof publicUrlCandidate === "string" && /^https?:\/\//i.test(publicUrlCandidate)) {
       return publicUrlCandidate;
     }
 
-    // createSignedUrl returns { data: { signedUrl: string }, error: ... }
-    const signedRes = await supabaseAdmin.storage.from(bucketName).createSignedUrl(avatarValue, 60);
-    const signedUrlCandidate = isObject(signedRes) ? (signedRes as any)?.data?.signedUrl : null;
+    // createSignedUrl (async)
+    const signedRes = (await supabaseAdmin.storage
+      .from(bucketName)
+      .createSignedUrl(avatarValue, 60)) as CreateSignedUrlResult;
+
+    const signedUrlCandidate = signedRes?.data?.signedUrl ?? null;
     if (typeof signedUrlCandidate === "string" && /^https?:\/\//i.test(signedUrlCandidate)) {
       return signedUrlCandidate;
     }
@@ -250,7 +260,12 @@ export async function GET() {
         .eq("email", approverEmail)
         .maybeSingle();
 
-      if (!apErr && approverProfileRaw && approverProfileRaw.graduation_year !== undefined && approverProfileRaw.graduation_year !== null) {
+      if (
+        !apErr &&
+        approverProfileRaw &&
+        approverProfileRaw.graduation_year !== undefined &&
+        approverProfileRaw.graduation_year !== null
+      ) {
         const ay = Number(approverProfileRaw.graduation_year);
         if (!Number.isNaN(ay)) allowedYears.add(ay);
       }
