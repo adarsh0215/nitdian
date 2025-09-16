@@ -3,16 +3,46 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import supabaseAdmin from "@/lib/supabase/admin";
 
-/**
- * Helper: safe JSON parse
- */
-function safeParseJSON<T = any>(value: any): T | null {
-  if (!value) return null;
+/** Local row types */
+type MemberMembershipRow = {
+  membership_type: string;
+  start_date: string | null;
+  end_date?: string | null;
+  params?: unknown;
+};
+
+type PrivilegeRow = {
+  membership_type: string;
+  privilege: string;
+  execute: boolean;
+};
+
+type ProfileRow = {
+  id: string;
+  full_name?: string | null;
+  graduation_year?: number | string | null;
+  branch?: string | null;
+  company?: string | null;
+  designation?: string | null;
+  avatar_url?: string | null;
+  status?: string | null;
+  is_approved?: boolean | null;
+};
+
+/** Safely parse JSON; returns null on failure */
+function safeParseJSON<T = unknown>(value: unknown): T | null {
+  if (value === null || value === undefined || value === "") return null;
   try {
-    return typeof value === "string" ? (JSON.parse(value) as T) : (value as T);
+    if (typeof value === "string") return JSON.parse(value) as T;
+    return value as T;
   } catch {
     return null;
   }
+}
+
+/** Narrowing helper */
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
 }
 
 /**
@@ -24,44 +54,26 @@ function safeParseJSON<T = any>(value: any): T | null {
  *    2) if that doesn't produce a usable URL, call createSignedUrl(path, 60)
  *
  * Returns null if a URL could not be produced.
- *
- * Note: bucketName should be changed if your bucket is named differently.
  */
 async function resolveAvatarPublicUrl(avatarValue?: string | null) {
   if (!avatarValue) return null;
-
-  // 1) if already full URL -> return it
   if (/^https?:\/\//i.test(avatarValue)) return avatarValue;
 
-  // 2) treat as storage path (bucket + path or path)
-  // If your app uses a bucket other than "avatars", change this value.
   const bucketName = "avatars";
 
   try {
-    // getPublicUrl returns { data: { publicUrl } } (supabase-js v2)
-    const { data: publicData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(avatarValue);
-    const publicUrl = (publicData as any)?.publicUrl ?? null;
-    if (publicUrl && /^https?:\/\//i.test(publicUrl)) {
-      return publicUrl;
+    // getPublicUrl may return { data: { publicUrl: string }, error: null } (v2)
+    const publicRes = supabaseAdmin.storage.from(bucketName).getPublicUrl(avatarValue);
+    const publicUrlCandidate = isObject(publicRes) ? (publicRes as any)?.data?.publicUrl : null;
+    if (typeof publicUrlCandidate === "string" && /^https?:\/\//i.test(publicUrlCandidate)) {
+      return publicUrlCandidate;
     }
 
-    // If the bucket is private or getPublicUrl didn't produce a usable URL,
-    // try creating a short-lived signed URL (60 seconds).
-    // createSignedUrl returns { data: { signedUrl } }.
-    const { data: signedData, error: signedErr } = await supabaseAdmin
-      .storage
-      .from(bucketName)
-      .createSignedUrl(avatarValue, 60);
-
-    if (signedErr) {
-      // signed url creation failed (maybe path doesn't exist); log and return null
-      console.warn("createSignedUrl failed:", signedErr?.message ?? signedErr);
-      return null;
-    }
-
-    const signedUrl = (signedData as any)?.signedUrl ?? null;
-    if (signedUrl && /^https?:\/\//i.test(signedUrl)) {
-      return signedUrl;
+    // createSignedUrl returns { data: { signedUrl: string }, error: ... }
+    const signedRes = await supabaseAdmin.storage.from(bucketName).createSignedUrl(avatarValue, 60);
+    const signedUrlCandidate = isObject(signedRes) ? (signedRes as any)?.data?.signedUrl : null;
+    if (typeof signedUrlCandidate === "string" && /^https?:\/\//i.test(signedUrlCandidate)) {
+      return signedUrlCandidate;
     }
 
     return null;
@@ -71,18 +83,21 @@ async function resolveAvatarPublicUrl(avatarValue?: string | null) {
   }
 }
 
-/**
- * Check whether membership.params allows the given graduation year
- * (left here for completeness — the route uses a set-based approach below).
- */
-function paramsAllowsYear(params: any, year: number): boolean {
-  if (!params) return false;
-  if (Array.isArray(params.batches)) {
-    return params.batches.some((y: any) => Number(y) === Number(year));
+/** Check whether membership.params allows the given graduation year (kept for completeness) */
+function paramsAllowsYear(params: unknown, year: number): boolean {
+  const parsed = safeParseJSON<Record<string, unknown>>(params);
+  if (!parsed) return false;
+
+  if (Array.isArray(parsed.batches)) {
+    return parsed.batches.some((y) => {
+      const n = Number(y);
+      return !Number.isNaN(n) && n === Number(year);
+    });
   }
-  const from = params.from !== undefined ? Number(params.from) : null;
-  const to = params.to !== undefined ? Number(params.to) : null;
-  if (from !== null && to !== null) {
+
+  const from = parsed.from !== undefined && parsed.from !== null ? Number(parsed.from) : null;
+  const to = parsed.to !== undefined && parsed.to !== null ? Number(parsed.to) : null;
+  if (from !== null && to !== null && !Number.isNaN(from) && !Number.isNaN(to)) {
     return Number(year) >= from && Number(year) <= to;
   }
   return false;
@@ -104,7 +119,7 @@ export async function GET() {
     const nowISO = new Date().toISOString();
 
     // 2) Load approver active memberships
-    const { data: memberships, error: memErr } = await supabaseAdmin
+    const { data: membershipsRaw, error: memErr } = await supabaseAdmin
       .from("member_memberships")
       .select("membership_type, start_date, end_date, params")
       .eq("user_email", approverEmail)
@@ -116,28 +131,31 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to read memberships" }, { status: 500 });
     }
 
-    const activeMemberships = (memberships || []).filter((m: any) => {
+    const memberships = (membershipsRaw ?? []) as MemberMembershipRow[];
+
+    const activeMemberships = memberships.filter((m) => {
       if (!m?.end_date) return true;
       try {
-        return new Date(m.end_date).toISOString() >= nowISO;
+        return new Date(String(m.end_date)).toISOString() >= nowISO;
       } catch {
         return false;
       }
     });
 
     if (activeMemberships.length === 0) {
-      // No active memberships → no privileges
       return NextResponse.json({ pending: [] });
     }
 
-    const membershipTypes = Array.from(new Set(activeMemberships.map((m: any) => m.membership_type))).filter(Boolean);
+    const membershipTypes = Array.from(
+      new Set(activeMemberships.map((m) => String(m.membership_type ?? "").trim()))
+    ).filter(Boolean) as string[];
 
     if (!membershipTypes.length) {
       return NextResponse.json({ pending: [] });
     }
 
     // 3) Load privileges for the membership types
-    const { data: privileges, error: privErr } = await supabaseAdmin
+    const { data: privilegesRaw, error: privErr } = await supabaseAdmin
       .from("membership_privilege")
       .select("membership_type, privilege, execute")
       .in("membership_type", membershipTypes)
@@ -148,18 +166,18 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to read privileges" }, { status: 500 });
     }
 
-    const hasApproveAll = (privileges || []).some(
-      (p: any) => p.privilege === "APPROVE_ONBOARD_ALL" && p.execute
-    );
-    const hasApproveBatch = (privileges || []).some(
-      (p: any) => p.privilege === "APPROVE_ONBOARD_BATCH" && p.execute
-    );
+    const privileges = (privilegesRaw ?? []) as PrivilegeRow[];
+
+    const hasApproveAll = privileges.some((p) => p.privilege === "APPROVE_ONBOARD_ALL" && Boolean(p.execute));
+    const hasApproveBatch = privileges.some((p) => p.privilege === "APPROVE_ONBOARD_BATCH" && Boolean(p.execute));
 
     // If has global approve -> return all pending profiles (with resolved avatars)
     if (hasApproveAll) {
-      const { data: pending, error: pErr } = await supabaseAdmin
+      const { data: pendingRaw, error: pErr } = await supabaseAdmin
         .from("profiles")
-        .select("id, full_name, graduation_year, branch, company, designation, avatar_url, status, is_approved")
+        .select(
+          "id, full_name, graduation_year, branch, company, designation, avatar_url, status, is_approved"
+        )
         .eq("status", "PENDING")
         .eq("is_approved", false)
         .limit(1000);
@@ -169,21 +187,22 @@ export async function GET() {
         return NextResponse.json({ error: "Failed to load pending profiles" }, { status: 500 });
       }
 
-      // Resolve avatar urls in parallel (safe & best-effort)
+      const pending = (pendingRaw ?? []) as ProfileRow[];
+
       const enriched = await Promise.all(
-        (pending || []).map(async (pr: any) => {
+        pending.map(async (pr) => {
           const avatar_public_url = await resolveAvatarPublicUrl(pr.avatar_url ?? null);
           return {
             id: pr.id,
-            full_name: pr.full_name,
-            graduation_year: pr.graduation_year,
+            full_name: pr.full_name ?? null,
+            graduation_year: pr.graduation_year ?? null,
             branch: pr.branch ?? null,
             company: pr.company ?? null,
             designation: pr.designation ?? null,
-            avatar_url: pr.avatar_url ?? null, // original stored value
+            avatar_url: pr.avatar_url ?? null,
             avatar_public_url,
-            status: pr.status,
-            is_approved: pr.is_approved,
+            status: pr.status ?? null,
+            is_approved: pr.is_approved ?? null,
           };
         })
       );
@@ -199,15 +218,14 @@ export async function GET() {
     // 4) hasApproveBatch true (but not approve all) -> compute allowed batches
     const allowedYears = new Set<number>();
 
-    // consider only memberships that are active and map to types that have batch privilege
     for (const m of activeMemberships) {
-      const mType = m.membership_type;
-      const typeHasBatch = (privileges || []).some(
-        (p: any) => p.membership_type === mType && p.privilege === "APPROVE_ONBOARD_BATCH" && p.execute
+      const mType = String(m.membership_type ?? "");
+      const typeHasBatch = privileges.some(
+        (p) => p.membership_type === mType && p.privilege === "APPROVE_ONBOARD_BATCH" && Boolean(p.execute)
       );
       if (!typeHasBatch) continue;
 
-      const params = safeParseJSON<any>(m.params);
+      const params = safeParseJSON<Record<string, unknown>>(m.params);
       if (!params) continue;
 
       if (Array.isArray(params.batches)) {
@@ -226,28 +244,30 @@ export async function GET() {
 
     // 5) fallback: if allowedYears is empty, use approver's profile graduation_year
     if (allowedYears.size === 0) {
-      const { data: approverProfile, error: apErr } = await supabaseAdmin
+      const { data: approverProfileRaw, error: apErr } = await supabaseAdmin
         .from("profiles")
         .select("graduation_year")
         .eq("email", approverEmail)
         .maybeSingle();
 
-      if (!apErr && approverProfile?.graduation_year) {
-        allowedYears.add(Number(approverProfile.graduation_year));
+      if (!apErr && approverProfileRaw && approverProfileRaw.graduation_year !== undefined && approverProfileRaw.graduation_year !== null) {
+        const ay = Number(approverProfileRaw.graduation_year);
+        if (!Number.isNaN(ay)) allowedYears.add(ay);
       }
     }
 
     if (allowedYears.size === 0) {
-      // nothing allowed
       return NextResponse.json({ pending: [] });
     }
 
     // 6) Fetch pending profiles that match allowedYears
     const yearsArray = Array.from(allowedYears.values()).map((y) => Number(y));
 
-    const { data: pendingFiltered, error: pfErr } = await supabaseAdmin
+    const { data: pendingFilteredRaw, error: pfErr } = await supabaseAdmin
       .from("profiles")
-      .select("id, full_name, graduation_year, branch, company, designation, avatar_url, status, is_approved")
+      .select(
+        "id, full_name, graduation_year, branch, company, designation, avatar_url, status, is_approved"
+      )
       .in("graduation_year", yearsArray)
       .eq("status", "PENDING")
       .eq("is_approved", false)
@@ -258,26 +278,28 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to load filtered pending profiles" }, { status: 500 });
     }
 
+    const pendingFiltered = (pendingFilteredRaw ?? []) as ProfileRow[];
+
     const enrichedFiltered = await Promise.all(
-      (pendingFiltered || []).map(async (pr: any) => {
+      pendingFiltered.map(async (pr) => {
         const avatar_public_url = await resolveAvatarPublicUrl(pr.avatar_url ?? null);
         return {
           id: pr.id,
-          full_name: pr.full_name,
-          graduation_year: pr.graduation_year,
+          full_name: pr.full_name ?? null,
+          graduation_year: pr.graduation_year ?? null,
           branch: pr.branch ?? null,
           company: pr.company ?? null,
           designation: pr.designation ?? null,
           avatar_url: pr.avatar_url ?? null,
           avatar_public_url,
-          status: pr.status,
-          is_approved: pr.is_approved,
+          status: pr.status ?? null,
+          is_approved: pr.is_approved ?? null,
         };
       })
     );
 
     return NextResponse.json({ pending: enrichedFiltered ?? [] });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("ERROR /api/pending:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }

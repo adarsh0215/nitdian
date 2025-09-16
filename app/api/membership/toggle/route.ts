@@ -2,26 +2,18 @@
 /**
  * POST /api/membership/toggle
  * Server-side route to toggle current user's membership between ADMIN_L1 <-> ADMIN_L2.
- *
- * Behavior:
- *  - Authenticate the user using supabaseServer() (reads cookies properly).
- *  - Query member_memberships rows for that user with membership_type IN ('ADMIN_L1','ADMIN_L2').
- *  - If one or more rows exist, update them to the other membership_type (L1->L2 or L2->L1).
- *  - If none exist, insert a new membership row with membership_type = 'ADMIN_L2' (promotion default)
- *    and start_date = now(), end_date = now + 1 year.
- *
- * Response JSON:
- *  { ok: true, newType: 'ADMIN_L2' }  on success
- *  { error: '...' }                    on failure
- *
- * This keeps logic simple and predictable for quick toggling for testing/admin usage.
  */
 
 import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase/server";
 import supabaseAdmin from "@/lib/supabase/admin";
 
-export async function POST(req: Request) {
+type MemberMembershipRow = {
+  id: string;
+  membership_type: string;
+};
+
+export async function POST(_req: Request) {
   try {
     // Authenticate (server-side) using your helper that awaits cookies()
     const sb = await supabaseServer();
@@ -32,7 +24,7 @@ export async function POST(req: Request) {
     const email = userData.user.email;
 
     // Find existing membership rows for this email that are ADMIN_L1 or ADMIN_L2
-    const { data: rows, error: selErr } = await supabaseAdmin
+    const { data: rowsRaw, error: selErr } = await supabaseAdmin
       .from("member_memberships")
       .select("id, membership_type")
       .in("membership_type", ["ADMIN_L1", "ADMIN_L2"])
@@ -42,12 +34,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: selErr.message }, { status: 500 });
     }
 
+    const rows = (rowsRaw ?? []) as MemberMembershipRow[];
+
     // Determine new membership type
     let newType = "ADMIN_L2"; // default when inserting or toggling from nothing
-    if (rows && rows.length > 0) {
+    if (rows.length > 0) {
       // If at least one row exists, pick the current type from the first row and toggle it.
-      // (If there are multiple rows with different types, we toggle all to the resulting type.)
-      const current = rows[0].membership_type;
+      const current = String(rows[0].membership_type ?? "");
       newType = current === "ADMIN_L2" ? "ADMIN_L1" : "ADMIN_L2";
 
       // Update all matching rows for this user (keeps DB consistent)
@@ -86,8 +79,9 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, newType });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("ERROR /api/membership/toggle:", err);
-    return NextResponse.json({ error: err?.message ?? "Unknown server error" }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message ?? "Unknown server error" }, { status: 500 });
   }
 }

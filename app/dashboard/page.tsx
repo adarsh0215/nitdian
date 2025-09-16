@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import Section from "@/components/dashboard/ui/Section";
 import SuggestionCard from "@/components/dashboard/SuggestionCard";
 import ProfileCard from "@/components/dashboard/ProfileCard";
-import ProfileCompletionCard from "@/components/dashboard/ProfileCompletionCard";
+// removed unused import: ProfileCompletionCard
 import { AlertCircle } from "lucide-react";
 import EventSection from "@/components/home/EventSection"; // <- new import
 
@@ -15,10 +15,51 @@ import EventSection from "@/components/home/EventSection"; // <- new import
 // Make sure this file exists at components/PendingListClient.tsx
 import PendingListClient from "@/components/PendingListClient";
 
+type MemberMembershipRow = {
+  membership_type: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  params?: unknown;
+};
+
+type PrivilegeRow = {
+  membership_type: string;
+  privilege: string;
+  execute: boolean;
+};
+
+type ProfileRow = {
+  id: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  branch?: string | null;
+  graduation_year?: number | string | null;
+  company?: string | null;
+  degree?: string | null;
+  city?: string | null;
+  country?: string | null;
+  designation?: string | null;
+  status?: string | null;
+  is_approved?: boolean | null;
+  email?: string | null;
+  created_at?: string | null;
+};
+
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function safeParseJSON<T = unknown>(value: unknown): T | null {
+  if (value === null || value === undefined || value === "") return null;
+  try {
+    if (typeof value === "string") return JSON.parse(value) as T;
+    return value as T;
+  } catch {
+    return null;
+  }
+}
 
 export default async function DashboardPage() {
-
-  
   // -------------- authenticate user (server-side) ----------------
   const sb = await supabaseServer();
   const {
@@ -52,11 +93,10 @@ export default async function DashboardPage() {
     .eq("is_approved", true)
     .neq("id", user.id);
 
-  if (profile?.graduation_year != null)
-    sQuery = sQuery.eq("graduation_year", profile.graduation_year);
+  if (profile?.graduation_year != null) sQuery = sQuery.eq("graduation_year", profile.graduation_year);
 
   const { data: strictMatches } = await sQuery;
-  let suggestions = strictMatches ?? [];
+  let suggestions = (strictMatches ?? []) as ProfileRow[];
 
   if (suggestions.length === 0) {
     const { data: yearOnly } = await sb
@@ -66,13 +106,11 @@ export default async function DashboardPage() {
       .eq("is_approved", true)
       .neq("id", user.id)
       .eq("graduation_year", profile?.graduation_year ?? -1);
-    suggestions = yearOnly ?? [];
+    suggestions = (yearOnly ?? []) as ProfileRow[];
   }
 
   const cleanSuggestions = Array.from(
-    new Map(
-      (suggestions ?? []).filter((p) => p?.id !== user.id).map((p) => [p.id, p])
-    ).values()
+    new Map((suggestions ?? []).filter((p) => p?.id !== user.id).map((p) => [p.id, p])).values()
   );
 
   const { count: batchmateCount } = await sb
@@ -85,25 +123,16 @@ export default async function DashboardPage() {
 
   // ------------------- NEW: compute pending approvals to show ------------------
   // We want server-side logic to only return profiles the approver is allowed to act on
-  // Steps:
-  // 1) Load approver's active memberships from member_memberships table (using admin client)
-  // 2) Load privileges for those membership_types from membership_privilege
-  // 3) If user has APPROVE_ONBOARD_ALL.execute => return all pending profiles
-  // 4) Else if user has APPROVE_ONBOARD_BATCH.execute => return pending profiles for same graduation_year
-  // 5) Else return empty list (no permissions)
-
-  // NOTE: We use supabaseAdmin (service role or anon depending on config) for reading these tables.
-  // supabaseServer was only used for authentication (reading the cookie-secured session).
-  let initialPending: any[] = [];
+  let initialPending: ProfileRow[] = [];
 
   try {
     // 1) fetch active memberships for this approver (user.email should exist)
-    const approverEmail = profile?.email ?? user.email ?? null;
+    const approverEmail = (profile?.email ?? user.email ?? null) as string | null;
 
     if (approverEmail) {
-      // pull recent memberships for this user_email that are currently active (approximate filtering)
+      // pull recent memberships for this user_email (approximate filtering)
       const nowISO = new Date().toISOString();
-      const { data: memberships, error: memErr } = await supabaseAdmin
+      const { data: membershipsRaw, error: memErr } = await supabaseAdmin
         .from("member_memberships")
         .select("membership_type, start_date, end_date, params")
         .eq("user_email", approverEmail)
@@ -113,22 +142,27 @@ export default async function DashboardPage() {
         // log and continue — fallback: no pending shown
         console.error("/dashboard: membership lookup error:", memErr);
       } else {
+        const memberships = (membershipsRaw ?? []) as MemberMembershipRow[];
+
         // filter to memberships that are currently active (start_date <= now && (end_date is null or end_date >= now))
-        const activeMemberships = (memberships || []).filter((m: any) => {
+        const activeMemberships = memberships.filter((m) => {
           try {
-            const startsOk = !m.start_date || new Date(m.start_date).toISOString() <= nowISO;
-            const endsOk = !m.end_date || new Date(m.end_date).toISOString() >= nowISO;
+            const startsOk =
+              !m.start_date || new Date(String(m.start_date)).toISOString() <= nowISO;
+            const endsOk = !m.end_date || new Date(String(m.end_date)).toISOString() >= nowISO;
             return startsOk && endsOk;
           } catch {
             return false;
           }
         });
 
-        const membershipTypes = Array.from(new Set(activeMemberships.map((m: any) => m.membership_type))).filter(Boolean);
+        const membershipTypes = Array.from(
+          new Set(activeMemberships.map((m) => String(m.membership_type ?? "").trim()))
+        ).filter(Boolean);
 
         if (membershipTypes.length > 0) {
           // 2) fetch privileges for these membership_types
-          const { data: privileges, error: privErr } = await supabaseAdmin
+          const { data: privilegesRaw, error: privErr } = await supabaseAdmin
             .from("membership_privilege")
             .select("membership_type, privilege, execute")
             .in("membership_type", membershipTypes)
@@ -137,14 +171,22 @@ export default async function DashboardPage() {
           if (privErr) {
             console.error("/dashboard: privileges lookup error:", privErr);
           } else {
-            const hasApproveAll = (privileges || []).some((p: any) => p.privilege === "APPROVE_ONBOARD_ALL" && p.execute);
-            const hasApproveBatch = (privileges || []).some((p: any) => p.privilege === "APPROVE_ONBOARD_BATCH" && p.execute);
+            const privileges = (privilegesRaw ?? []) as PrivilegeRow[];
+
+            const hasApproveAll = privileges.some(
+              (p) => p.privilege === "APPROVE_ONBOARD_ALL" && Boolean(p.execute)
+            );
+            const hasApproveBatch = privileges.some(
+              (p) => p.privilege === "APPROVE_ONBOARD_BATCH" && Boolean(p.execute)
+            );
 
             if (hasApproveAll) {
               // return top N pending profiles (all)
               const { data: pendingAll, error: pErr } = await supabaseAdmin
                 .from("profiles")
-                .select("id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company")
+                .select(
+                  "id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company"
+                )
                 .eq("status", "PENDING")
                 .eq("is_approved", false)
                 .limit(50)
@@ -153,15 +195,19 @@ export default async function DashboardPage() {
               if (pErr) {
                 console.error("/dashboard: fetch pending all error:", pErr);
               } else {
-                initialPending = pendingAll ?? [];
+                initialPending = (pendingAll ?? []) as ProfileRow[];
               }
             } else if (hasApproveBatch) {
               // approver can approve only their batch: use approver's graduation_year (from profiles)
-              const approverYear = profile?.graduation_year ?? null;
-              if (approverYear !== null && approverYear !== undefined) {
+              const approverYearRaw = profile?.graduation_year ?? null;
+              const approverYear = approverYearRaw !== null && approverYearRaw !== undefined ? Number(approverYearRaw) : null;
+
+              if (approverYear !== null && !Number.isNaN(approverYear)) {
                 const { data: pendingBatch, error: pErr } = await supabaseAdmin
                   .from("profiles")
-                  .select("id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company")
+                  .select(
+                    "id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company"
+                  )
                   .eq("status", "PENDING")
                   .eq("is_approved", false)
                   .eq("graduation_year", approverYear)
@@ -171,7 +217,7 @@ export default async function DashboardPage() {
                 if (pErr) {
                   console.error("/dashboard: fetch pending batch error:", pErr);
                 } else {
-                  initialPending = pendingBatch ?? [];
+                  initialPending = (pendingBatch ?? []) as ProfileRow[];
                 }
               } else {
                 // no approver year known -> no batch items
@@ -188,7 +234,7 @@ export default async function DashboardPage() {
         }
       }
     }
-  } catch (e) {
+  } catch (e: unknown) {
     console.error("/dashboard: error preparing pending list:", e);
     initialPending = []; // fail safe
   }
@@ -216,7 +262,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="h-full">
-          <ProfileCard profile={profile} />
+          <ProfileCard profile={profile as ProfileRow} />
         </div>
       </div>
 
@@ -256,19 +302,14 @@ export default async function DashboardPage() {
       ) : null}
 
       {/* ---------- NEW: Pending Approvals Section (only for approvers) ---------- */}
-      {/* ---------- NEW: Pending Approvals Section (only for approvers) ---------- */}
-{initialPending.length > 0 ? (
-  <div className="space-y-4 lg:col-span-2">
-    <Section
-      title={`Pending Approvals (${initialPending.length})`}
-      cta={null}
-    >
-      {/* Pass server-side fetched list as initialPending */}
-      <PendingListClient initialPending={initialPending} />
-    </Section>
-  </div>
-) : null}
-
+      {initialPending.length > 0 ? (
+        <div className="space-y-4 lg:col-span-2">
+          <Section title={`Pending Approvals (${initialPending.length})`} cta={null}>
+            {/* Pass server-side fetched list as initialPending */}
+            <PendingListClient initialPending={initialPending} />
+          </Section>
+        </div>
+      ) : null}
     </main>
   );
 }
