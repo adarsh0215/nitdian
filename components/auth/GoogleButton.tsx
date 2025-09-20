@@ -1,3 +1,4 @@
+// components/GoogleButton.tsx
 "use client";
 
 import * as React from "react";
@@ -9,7 +10,7 @@ type GoogleState =
   | { ok: false; error: string }
   | null;
 
-// Official multicolor Google "G" logo (from brand guidelines)
+/** Official multicolor Google "G" logo (from brand guidelines) */
 function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 533.5 544.3" aria-hidden>
@@ -21,7 +22,7 @@ function GoogleIcon({ className }: { className?: string }) {
   );
 }
 
-// allow only same-origin app paths, ignore "/" so we default to /dashboard
+/** Only allow same-origin relative paths — return undefined to use default. */
 function safePath(p?: string | null) {
   if (!p) return undefined;
   if (p === "/") return undefined;
@@ -29,33 +30,42 @@ function safePath(p?: string | null) {
 }
 
 export default function GoogleButton({ next }: { next?: string }) {
-  // resolve next: prop > URL ?next > default '/dashboard'
+  // Resolve redirect path: prop > ?next query > default '/dashboard'
   const [resolvedNext] = React.useState<string>(() => {
     const fromProp = safePath(next);
     if (fromProp) return fromProp;
 
     if (typeof window !== "undefined") {
-      const sp = new URLSearchParams(window.location.search);
-      const fromQuery = safePath(sp.get("next"));
-      if (fromQuery) return fromQuery;
+      try {
+        const sp = new URLSearchParams(window.location.search);
+        const fromQuery = safePath(sp.get("next"));
+        if (fromQuery) return fromQuery;
+      } catch {
+        // ignore URL parsing errors in weird environments
+      }
     }
 
     return "/dashboard";
   });
 
+  /**
+   * Server action wrapper
+   * The server action `signInWithGoogle` should accept (state, formData) and return GoogleState
+   * We keep the callback signature exactly as your existing contract.
+   */
   const action = React.useCallback(
     async (_state: GoogleState, formData: FormData): Promise<GoogleState> => {
-      // your server action will return { ok, url } or { ok:false, error }
       return await signInWithGoogle(null, formData);
     },
     []
   );
 
+  // react's action-state hook (App Router server action helper)
   const [state, formAction, pending] = React.useActionState<GoogleState, FormData>(action, null);
 
+  // When server returns ok + url, redirect the browser to that provider URL
   React.useEffect(() => {
     if (state?.ok && state.url) {
-      // Redirect the browser to the provider URL Supabase gave us
       window.location.assign(state.url);
     }
   }, [state]);
@@ -79,9 +89,7 @@ export default function GoogleButton({ next }: { next?: string }) {
         <span>{pending ? "Redirecting…" : "Continue with Google"}</span>
       </button>
 
-      {!state?.ok && state?.error ? (
-        <p className="mt-2 text-sm text-red-600">{state.error}</p>
-      ) : null}
+      {!state?.ok && state?.error ? <p className="mt-2 text-sm text-red-600">{state.error}</p> : null}
     </form>
   );
 }

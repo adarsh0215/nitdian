@@ -27,13 +27,17 @@ export default function PhoneE164Field({
 }) {
   const raw = useWatch({ control, name: "phone_e164" });
 
-  const [phoneCode, setPhoneCode] = React.useState<string>(COUNTRY_CALLING_CODES[0].code);
+  const [phoneCode, setPhoneCode] = React.useState<string>(
+    COUNTRY_CALLING_CODES[0].code
+  );
   const [phoneLocal, setPhoneLocal] = React.useState<string>("");
 
   React.useEffect(() => {
     const current = typeof raw === "string" ? raw : "";
     if (current.startsWith("+")) {
-      const sorted = [...COUNTRY_CALLING_CODES].sort((a, b) => b.code.length - a.code.length);
+      const sorted = [...COUNTRY_CALLING_CODES].sort(
+        (a, b) => b.code.length - a.code.length
+      );
       const match = sorted.find((c) => current.startsWith(c.code));
       const cc = match?.code ?? COUNTRY_CALLING_CODES[0].code;
       setPhoneCode(cc);
@@ -43,7 +47,12 @@ export default function PhoneE164Field({
     }
   }, [raw]);
 
-  const update = (onChange: (v: string) => void, code: string, local: string) => {
+  const update = (
+    onChange: (v: string) => void,
+    value: string,
+    local: string
+  ) => {
+    const [, code] = value.split("-"); // iso-code string → take code part
     const cleaned = local.replace(/[^\d]/g, "");
     setPhoneCode(code);
     setPhoneLocal(cleaned);
@@ -62,7 +71,9 @@ export default function PhoneE164Field({
               {/* Country code select */}
               <div className="min-w-0">
                 <Select
-                  value={phoneCode}
+                  value={`${
+                    COUNTRY_CALLING_CODES.find((c) => c.code === phoneCode)?.iso
+                  }-${phoneCode}`}
                   onValueChange={(v) => update(field.onChange, v, phoneLocal)}
                 >
                   <SelectTrigger
@@ -75,7 +86,10 @@ export default function PhoneE164Field({
                   </SelectTrigger>
                   <SelectContent className="max-h-72">
                     {COUNTRY_CALLING_CODES.map((c) => (
-                      <SelectItem key={c.code} value={c.code}>
+                      <SelectItem
+                        key={`${c.iso}-${c.code}`}
+                        value={`${c.iso}-${c.code}`}
+                      >
                         {c.label}
                       </SelectItem>
                     ))}
@@ -89,7 +103,17 @@ export default function PhoneE164Field({
                   id={idLocal}
                   className="w-full"
                   value={phoneLocal}
-                  onChange={(e) => update(field.onChange, phoneCode, e.target.value)}
+                  onChange={(e) =>
+                    update(
+                      field.onChange,
+                      `${
+                        COUNTRY_CALLING_CODES.find(
+                          (c) => c.code === phoneCode
+                        )?.iso
+                      }-${phoneCode}`,
+                      e.target.value
+                    )
+                  }
                   placeholder="XXXXXXXXXX"
                   inputMode="tel"
                   autoComplete="tel"

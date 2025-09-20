@@ -1,7 +1,7 @@
 // app/(auth)/login/page.tsx
 import AuthCard from "@/components/auth/AuthCard";
 import EmailPasswordForm from "@/components/auth/EmailPasswordForm";
-import GoogleButton from "@/components/auth/GoogleButton";
+import GoogleButtonGSI from "@/components/auth/GoogleButtonGSI";
 import Link from "next/link";
 
 export const metadata = { title: "Sign in" };
@@ -21,7 +21,7 @@ export default async function Page({
   return (
     <AuthCard title="Welcome back" subtitle="Log in to your alumni account">
       {/* Primary: Google on top */}
-      <GoogleButton next={next} />
+      <GoogleButtonGSI next={next} />
 
       {/* Premium divider */}
       <div className="relative my-6">

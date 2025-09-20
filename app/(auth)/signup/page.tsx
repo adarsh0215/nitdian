@@ -1,6 +1,6 @@
 import AuthCard from "@/components/auth/AuthCard";
 import EmailPasswordForm from "@/components/auth/EmailPasswordForm";
-import GoogleButton from "@/components/auth/GoogleButton";
+import GoogleButtonGSI from "@/components/auth/GoogleButtonGSI";
 import Link from "next/link";
 
 export const metadata = { title: "Create your account" };
@@ -22,7 +22,7 @@ export default async function Page({
   return (
     <AuthCard title="Create your account" subtitle="Join the alumni network in seconds">
       {/* Primary: Google on top */}
-      <GoogleButton next={next} />
+      <GoogleButtonGSI next={next} />
 
       {/* Premium divider */}
       <div className="relative my-6">

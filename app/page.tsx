@@ -18,6 +18,7 @@ import Featured from "@/components/home/Featured";
 import { HOMEPAGE_DATA } from "@/components/home/data";
 import ImageTicker from "@/components/home/ImageTicker";
 import EventSection from "@/components/home/EventSection";
+import Image from "next/image"; // add at the top with other imports
 
 export const metadata = {
   title: "Alumni Network — NIT Durgapur",
@@ -49,21 +50,41 @@ export default function Page() {
       {/* Brand strip: logos / partner strip directly under hero */}
       <BrandStrip caption={d.brands.caption} brands={d.brands.items} />
 
-      <section className="py-10 sm:py-14">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-12">
-          <EventSection
-            title="Shri Shankracharya Ji Maharaj at NIT Durgapur"
-            subtitle="Motivational Speech on"
-            dates={[
-              { date: "10 Sept 2025", times: "  5:00 PM" },
-              
-            ]}
-            ctaHref="/login"
-            ctaLabel="Login to watch"
-          />
-        </div>
-      </section>
+     <section className="py-10 sm:py-14 bg-gray-50">
+  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
+      
+      {/* Poster */}
+      <div className="flex justify-center">
+        <Image
+          src="/events/poster.jpg"
+          alt="Event Poster"
+          width={400}
+          height={500}
+          className="
+            rounded-xl shadow-lg object-contain
+            max-h-[420px] sm:max-h-[460px] lg:max-h-[480px]
+            w-auto
+          "
+        />
+      </div>
 
+      {/* Event Card */}
+      <div className="flex justify-center">
+        <EventSection
+          title="Shri Shankracharya Ji Maharaj at NIT Durgapur"
+          subtitle="Motivational Speech on"
+          dates={[{ date: "10 Sept 2025", times: "5:00 PM" }]}
+          ctaHref="/login"
+          ctaLabel="Login to watch"
+        />
+      </div>
+
+    </div>
+  </div>
+</section>
+
+      
       {/* Why join / Value grid */}
       <section className="py-10 sm:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
