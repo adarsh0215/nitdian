@@ -13,12 +13,15 @@ interface GoogleAccountsId {
     client_id: string;
     callback: (resp: GoogleCredentialResponse) => void;
     ux_mode?: "popup" | "redirect";
-    auto_select?: boolean; // <- added
+    auto_select?: boolean;
   }) => void;
-  renderButton: (el: HTMLElement, options?: Record<string, unknown>) => void;
+  renderButton?: (el: HTMLElement, options?: Record<string, unknown>) => void;
   prompt?: (listener?: (notification: unknown) => void) => void;
 }
 
+/**
+ * Local type that composes Window so we don't clash with any global declarations.
+ */
 type WindowWithGSI = Window & {
   google?: {
     accounts?: {
@@ -31,6 +34,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gsiRendered, setGsiRendered] = useState(false);
+
   const renderedRef = useRef(false);
   const initialized = useRef(false);
   const supabase = supabaseBrowser();
@@ -55,31 +59,70 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
       : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
+  /**
+   * Aggressive style enforcement for any markup Google may inject.
+   * Returns true if a button-like element was found and styled.
+   */
   const enforceFullWidth = useCallback(() => {
     const el = document.getElementById("gsi-btn");
     if (!el) return false;
-    const btn = el.querySelector("button");
-    if (!btn) return false;
-    (btn as HTMLButtonElement).style.width = "100%";
-    (btn as HTMLButtonElement).style.maxWidth = "100%";
-    (btn as HTMLButtonElement).style.display = "flex";
-    (btn as HTMLButtonElement).style.justifyContent = "center";
-    (btn as HTMLButtonElement).style.alignItems = "center";
-    (btn as HTMLButtonElement).style.paddingLeft = "0.75rem";
-    (btn as HTMLButtonElement).style.paddingRight = "0.75rem";
+
+    // Ensure container fills available width
+    el.style.width = "100%";
+    el.style.maxWidth = "100%";
+    el.style.boxSizing = "border-box";
+
+    // Search for obvious candidates
+    const candidates = Array.from(
+      el.querySelectorAll<HTMLElement>("button, [role='button'], div > button, div[role='button']")
+    );
+
+    if (candidates.length === 0) {
+      // Fallback: style direct children so injected structure still expands
+      const children = Array.from(el.children) as HTMLElement[];
+      children.forEach((c) => {
+        c.style.width = "100%";
+        c.style.maxWidth = "100%";
+        c.style.display = "block";
+        c.style.boxSizing = "border-box";
+      });
+      return false;
+    }
+
+    candidates.forEach((btn) => {
+      btn.style.width = "100%";
+      btn.style.maxWidth = "100%";
+      btn.style.display = "block";
+      btn.style.boxSizing = "border-box";
+      // center inner contents when possible
+      btn.style.justifyContent = "center";
+      btn.style.alignItems = "center";
+      // match padding a bit to your UI
+      btn.style.paddingLeft = "0.75rem";
+      btn.style.paddingRight = "0.75rem";
+    });
+
     return true;
   }, []);
 
+  // MutationObserver to watch for injected nodes
   useEffect(() => {
     const container = document.getElementById("gsi-btn");
     if (!container) return;
 
-    if (enforceFullWidth()) return;
+    // Try immediate enforcement first
+    if (enforceFullWidth()) {
+      return;
+    }
 
     const observer = new MutationObserver(() => {
-      if (enforceFullWidth()) observer.disconnect();
+      if (enforceFullWidth()) {
+        observer.disconnect();
+      }
     });
+
     observer.observe(container, { childList: true, subtree: true });
+
     return () => observer.disconnect();
   }, [enforceFullWidth]);
 
@@ -88,12 +131,13 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
       const clientId = getClientId();
       if (!clientId) {
         setError("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID (check .env.local / Vercel envs)");
+        console.error("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID");
         return;
       }
 
       const win = window as unknown as WindowWithGSI;
       const gsi = win.google?.accounts?.id;
-      if (!gsi) return;
+      if (!gsi) return; // script not available yet
 
       if (initialized.current) {
         cb?.();
@@ -101,25 +145,25 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
       }
 
       try {
-        // IMPORTANT: set auto_select: false so Google doesn't show the compact auto-select
+        // Prevent Google from auto-selecting and injecting the compact chooser
         gsi.initialize({
           client_id: clientId,
           callback: (resp: GoogleCredentialResponse) => {
             void handleCredentialResponse(resp);
           },
           ux_mode: "popup",
-          auto_select: false, // <- prevents the compact account-chooser flash
+          auto_select: false,
         });
 
         const el = document.getElementById("gsi-btn");
-        if (el && !renderedRef.current) {
-          // render the standard Google button (we still enforce full width via CSS/JS)
+        if (el && !renderedRef.current && typeof gsi.renderButton === "function") {
+          // Ask GSI to render a standard button (we still enforce full width)
           gsi.renderButton(el as HTMLElement, { theme: "outline", size: "large" });
 
           renderedRef.current = true;
           setGsiRendered(true);
 
-          // nudge enforcement after render (observer still running)
+          // attempt enforcement shortly after render
           setTimeout(() => enforceFullWidth(), 50);
         }
 
@@ -158,6 +202,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
     [resolvedNext, supabase]
   );
 
+  // keep trying init in case script loads later
   useEffect(() => {
     const id = setInterval(() => {
       initGsi();
@@ -172,19 +217,26 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
 
   return (
     <>
-      {/* Inline CSS to force any injected GSI button to be full-width immediately. */}
+      {/* Aggressive inline CSS scoped to the Google container so any injected markup is full width
+          This only targets elements under #gsi-btn so the rest of the page is unaffected. */}
       <style>{`
+        #gsi-btn, #gsi-btn > *, #gsi-btn * { box-sizing: border-box !important; }
         #gsi-btn button,
+        #gsi-btn [role="button"],
         #gsi-btn div > button,
+        #gsi-btn div[role="button"],
         #gsi-btn div div > button,
-        #gsi-btn > div > div > button {
+        #gsi-btn > div > div {
           width: 100% !important;
           max-width: 100% !important;
-          display: flex !important;
+          display: block !important;
+          box-sizing: border-box !important;
+        }
+        #gsi-btn button > *, #gsi-btn [role="button"] > * {
+          display: inline-flex !important;
           justify-content: center !important;
           align-items: center !important;
-          padding-left: 0.75rem !important;
-          padding-right: 0.75rem !important;
+          width: 100% !important;
         }
       `}</style>
 
@@ -203,7 +255,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
       {/* container for Google-injected button */}
       <div id="gsi-btn" className="w-full" />
 
-      {/* fallback: only visible while GSI hasn't rendered */}
+      {/* fallback: visible only until gsi renders */}
       {!gsiRendered ? (
         <div className="mt-3">
           <button
