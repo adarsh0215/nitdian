@@ -19,9 +19,6 @@ interface GoogleAccountsId {
   prompt?: (listener?: (notification: unknown) => void) => void;
 }
 
-/**
- * Local type that composes Window so we don't clash with any global declarations.
- */
 type WindowWithGSI = Window & {
   google?: {
     accounts?: {
@@ -47,82 +44,45 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         const q = sp.get("next");
         if (q && q !== "/" && q.startsWith("/") && !q.startsWith("//")) return q;
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
     return "/dashboard";
   })();
 
   const getClientId = () =>
     typeof window !== "undefined"
-      ? (window as unknown as Window & { __NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string }).__NEXT_PUBLIC_GOOGLE_CLIENT_ID ??
-        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      ? (window as unknown as Window & { __NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string })
+          .__NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
       : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
-  /**
-   * Aggressive style enforcement for any markup Google may inject.
-   * Returns true if a button-like element was found and styled.
-   */
   const enforceFullWidth = useCallback(() => {
     const el = document.getElementById("gsi-btn");
     if (!el) return false;
 
-    // Ensure container fills available width
     el.style.width = "100%";
     el.style.maxWidth = "100%";
-    el.style.boxSizing = "border-box";
 
-    // Search for obvious candidates
-    const candidates = Array.from(
-      el.querySelectorAll<HTMLElement>("button, [role='button'], div > button, div[role='button']")
-    );
-
-    if (candidates.length === 0) {
-      // Fallback: style direct children so injected structure still expands
-      const children = Array.from(el.children) as HTMLElement[];
-      children.forEach((c) => {
-        c.style.width = "100%";
-        c.style.maxWidth = "100%";
-        c.style.display = "block";
-        c.style.boxSizing = "border-box";
-      });
-      return false;
-    }
-
+    const candidates = Array.from(el.querySelectorAll<HTMLElement>("button, [role='button']"));
     candidates.forEach((btn) => {
       btn.style.width = "100%";
       btn.style.maxWidth = "100%";
-      btn.style.display = "block";
-      btn.style.boxSizing = "border-box";
-      // center inner contents when possible
+      btn.style.display = "flex";
       btn.style.justifyContent = "center";
       btn.style.alignItems = "center";
-      // match padding a bit to your UI
-      btn.style.paddingLeft = "0.75rem";
-      btn.style.paddingRight = "0.75rem";
     });
 
-    return true;
+    return candidates.length > 0;
   }, []);
 
-  // MutationObserver to watch for injected nodes
   useEffect(() => {
     const container = document.getElementById("gsi-btn");
     if (!container) return;
 
-    // Try immediate enforcement first
-    if (enforceFullWidth()) {
-      return;
-    }
+    if (enforceFullWidth()) return;
 
     const observer = new MutationObserver(() => {
-      if (enforceFullWidth()) {
-        observer.disconnect();
-      }
+      if (enforceFullWidth()) observer.disconnect();
     });
-
     observer.observe(container, { childList: true, subtree: true });
-
     return () => observer.disconnect();
   }, [enforceFullWidth]);
 
@@ -130,49 +90,35 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
     (cb?: () => void) => {
       const clientId = getClientId();
       if (!clientId) {
-        setError("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID (check .env.local / Vercel envs)");
-        console.error("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID");
+        setError("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID");
         return;
       }
-
       const win = window as unknown as WindowWithGSI;
       const gsi = win.google?.accounts?.id;
-      if (!gsi) return; // script not available yet
+      if (!gsi) return;
 
       if (initialized.current) {
         cb?.();
         return;
       }
 
-      try {
-        // Prevent Google from auto-selecting and injecting the compact chooser
-        gsi.initialize({
-          client_id: clientId,
-          callback: (resp: GoogleCredentialResponse) => {
-            void handleCredentialResponse(resp);
-          },
-          ux_mode: "popup",
-          auto_select: false,
-        });
+      gsi.initialize({
+        client_id: clientId,
+        callback: (resp: GoogleCredentialResponse) => void handleCredentialResponse(resp),
+        ux_mode: "popup",
+        auto_select: false,
+      });
 
-        const el = document.getElementById("gsi-btn");
-        if (el && !renderedRef.current && typeof gsi.renderButton === "function") {
-          // Ask GSI to render a standard button (we still enforce full width)
-          gsi.renderButton(el as HTMLElement, { theme: "outline", size: "large" });
-
-          renderedRef.current = true;
-          setGsiRendered(true);
-
-          // attempt enforcement shortly after render
-          setTimeout(() => enforceFullWidth(), 50);
-        }
-
-        initialized.current = true;
-        cb?.();
-      } catch (err) {
-        console.error("GSI initialize error", err);
-        setError("Failed to initialize Google Identity");
+      const el = document.getElementById("gsi-btn");
+      if (el && !renderedRef.current && typeof gsi.renderButton === "function") {
+        gsi.renderButton(el, { theme: "outline", size: "large" });
+        renderedRef.current = true;
+        setGsiRendered(true);
+        setTimeout(() => enforceFullWidth(), 50);
       }
+
+      initialized.current = true;
+      cb?.();
     },
     [enforceFullWidth]
   );
@@ -202,7 +148,6 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
     [resolvedNext, supabase]
   );
 
-  // keep trying init in case script loads later
   useEffect(() => {
     const id = setInterval(() => {
       initGsi();
@@ -217,45 +162,25 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
 
   return (
     <>
-      {/* Aggressive inline CSS scoped to the Google container so any injected markup is full width
-          This only targets elements under #gsi-btn so the rest of the page is unaffected. */}
       <style>{`
-        #gsi-btn, #gsi-btn > *, #gsi-btn * { box-sizing: border-box !important; }
-        #gsi-btn button,
-        #gsi-btn [role="button"],
-        #gsi-btn div > button,
-        #gsi-btn div[role="button"],
-        #gsi-btn div div > button,
-        #gsi-btn > div > div {
+        #gsi-btn button, #gsi-btn [role="button"] {
           width: 100% !important;
           max-width: 100% !important;
-          display: block !important;
-          box-sizing: border-box !important;
-        }
-        #gsi-btn button > *, #gsi-btn [role="button"] > * {
-          display: inline-flex !important;
+          display: flex !important;
           justify-content: center !important;
           align-items: center !important;
-          width: 100% !important;
         }
       `}</style>
 
       <Script
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
-        onLoad={() => {
-          initGsi();
-        }}
-        onError={(e) => {
-          console.error("Google Identity script failed to load", e);
-          setError("Failed to load Google script");
-        }}
+        onLoad={() => initGsi()}
+        onError={() => setError("Failed to load Google script")}
       />
 
-      {/* container for Google-injected button */}
       <div id="gsi-btn" className="w-full" />
 
-      {/* fallback: visible only until gsi renders */}
       {!gsiRendered ? (
         <div className="mt-3">
           <button
@@ -264,25 +189,13 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
               const win = window as unknown as WindowWithGSI;
               const gsi = win.google?.accounts?.id;
               if (!gsi) {
-                setError("Google auth not ready — please refresh the page.");
+                setError("Google auth not ready — refresh the page.");
                 return;
               }
               if (!initialized.current) {
-                initGsi(() => {
-                  try {
-                    gsi.prompt?.();
-                  } catch (e) {
-                    console.error("Prompt error after init", e);
-                    setError("Google prompt failed");
-                  }
-                });
+                initGsi(() => gsi.prompt?.());
               } else {
-                try {
-                  gsi.prompt?.();
-                } catch (e) {
-                  console.error("Prompt error", e);
-                  setError("Google prompt failed");
-                }
+                gsi.prompt?.();
               }
             }}
             disabled={loading}
@@ -294,7 +207,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         </div>
       ) : null}
 
-      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </>
   );
 }
