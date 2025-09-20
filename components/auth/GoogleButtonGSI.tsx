@@ -13,18 +13,19 @@ interface GoogleAccountsId {
     client_id: string;
     callback: (resp: GoogleCredentialResponse) => void;
     ux_mode?: "popup" | "redirect";
+    auto_select?: boolean; // <- added
   }) => void;
   renderButton: (el: HTMLElement, options?: Record<string, unknown>) => void;
   prompt?: (listener?: (notification: unknown) => void) => void;
 }
 
-interface WindowWithGSI extends Window {
+type WindowWithGSI = Window & {
   google?: {
     accounts?: {
       id?: GoogleAccountsId;
     };
   };
-}
+};
 
 export default function GoogleButtonGSI({ next }: { next?: string }) {
   const [loading, setLoading] = useState(false);
@@ -64,6 +65,8 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
     (btn as HTMLButtonElement).style.display = "flex";
     (btn as HTMLButtonElement).style.justifyContent = "center";
     (btn as HTMLButtonElement).style.alignItems = "center";
+    (btn as HTMLButtonElement).style.paddingLeft = "0.75rem";
+    (btn as HTMLButtonElement).style.paddingRight = "0.75rem";
     return true;
   }, []);
 
@@ -98,22 +101,25 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
       }
 
       try {
+        // IMPORTANT: set auto_select: false so Google doesn't show the compact auto-select
         gsi.initialize({
           client_id: clientId,
           callback: (resp: GoogleCredentialResponse) => {
             void handleCredentialResponse(resp);
           },
           ux_mode: "popup",
+          auto_select: false, // <- prevents the compact account-chooser flash
         });
 
         const el = document.getElementById("gsi-btn");
         if (el && !renderedRef.current) {
+          // render the standard Google button (we still enforce full width via CSS/JS)
           gsi.renderButton(el as HTMLElement, { theme: "outline", size: "large" });
 
           renderedRef.current = true;
           setGsiRendered(true);
 
-          // try enforcement shortly after render (observer already watching too)
+          // nudge enforcement after render (observer still running)
           setTimeout(() => enforceFullWidth(), 50);
         }
 
@@ -166,8 +172,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
 
   return (
     <>
-      {/* Inline CSS to force any injected GSI button to be full-width immediately.
-          Targets common injection structures; safe and scoped to #gsi-btn only. */}
+      {/* Inline CSS to force any injected GSI button to be full-width immediately. */}
       <style>{`
         #gsi-btn button,
         #gsi-btn div > button,
