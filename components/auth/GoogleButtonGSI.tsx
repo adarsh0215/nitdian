@@ -56,8 +56,6 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
   })();
 
   const getClientId = () => {
-    // NOTE: Next.js will inline process.env... into the bundle for NEXT_PUBLIC_ variables.
-    // Keeping the window fallback helps some setups that define the var on the client globally.
     return typeof window !== "undefined"
       ? (window as unknown as Window & { __NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string }).__NEXT_PUBLIC_GOOGLE_CLIENT_ID ??
           process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
@@ -94,10 +92,10 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
 
         const el = document.getElementById("gsi-btn");
         if (el && !renderedRef.current) {
+          // Ask GSI to render. We still set container styles so injected element fills width.
           gsi.renderButton(el as HTMLElement, {
             theme: "outline",
             size: "large",
-            width: "100%",
           });
 
           // mark as rendered (ref for idempotence, state to trigger re-render)
@@ -170,8 +168,13 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         }}
       />
 
-      {/* Official Google button rendered here by GSI */}
-      <div id="gsi-btn" />
+      {/* Official Google button rendered here by GSI
+          Tailwind child selector forces Google-inserted element to full width and centered.
+          The injected structure by GSI is usually a div > div > button, so this targets the direct child. */}
+      <div
+        id="gsi-btn"
+        className="w-full [&>div]:w-full [&>div]:flex [&>div]:justify-center"
+      />
 
       {/* Fallback button: show ONLY if GSI hasn't rendered the official button yet */}
       {!gsiRendered ? (
