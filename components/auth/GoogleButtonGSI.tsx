@@ -1,4 +1,3 @@
-// components/auth/GoogleButtonGSI.tsx
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -15,7 +14,6 @@ interface GoogleAccountsId {
     ux_mode?: "popup" | "redirect";
     auto_select?: boolean;
   }) => void;
-  renderButton?: (el: HTMLElement, options?: Record<string, unknown>) => void;
   prompt?: (listener?: (notification: unknown) => void) => void;
 }
 
@@ -30,98 +28,17 @@ type WindowWithGSI = Window & {
 export default function GoogleButtonGSI({ next }: { next?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [gsiRendered, setGsiRendered] = useState(false);
-
-  const renderedRef = useRef(false);
   const initialized = useRef(false);
   const supabase = supabaseBrowser();
 
-  const resolvedNext = (() => {
-    try {
-      if (next && next !== "/" && next.startsWith("/") && !next.startsWith("//")) return next;
-      if (typeof window !== "undefined") {
-        const sp = new URLSearchParams(window.location.search);
-        const q = sp.get("next");
-        if (q && q !== "/" && q.startsWith("/") && !q.startsWith("//")) return q;
-      }
-    } catch {}
-    return "/dashboard";
-  })();
+  const resolvedNext =
+    next && next.startsWith("/") && next !== "/" ? next : "/dashboard";
 
   const getClientId = () =>
-    typeof window !== "undefined"
-      ? (window as unknown as Window & { __NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string })
-          .__NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-      : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-
-  const enforceFullWidth = useCallback(() => {
-    const el = document.getElementById("gsi-btn");
-    if (!el) return false;
-
-    el.style.width = "100%";
-    el.style.maxWidth = "100%";
-
-    const candidates = Array.from(el.querySelectorAll<HTMLElement>("button, [role='button']"));
-    candidates.forEach((btn) => {
-      btn.style.width = "100%";
-      btn.style.maxWidth = "100%";
-      btn.style.display = "flex";
-      btn.style.justifyContent = "center";
-      btn.style.alignItems = "center";
-    });
-
-    return candidates.length > 0;
-  }, []);
-
-  useEffect(() => {
-    const container = document.getElementById("gsi-btn");
-    if (!container) return;
-
-    if (enforceFullWidth()) return;
-
-    const observer = new MutationObserver(() => {
-      if (enforceFullWidth()) observer.disconnect();
-    });
-    observer.observe(container, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [enforceFullWidth]);
-
-  const initGsi = useCallback(
-    (cb?: () => void) => {
-      const clientId = getClientId();
-      if (!clientId) {
-        setError("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID");
-        return;
-      }
-      const win = window as unknown as WindowWithGSI;
-      const gsi = win.google?.accounts?.id;
-      if (!gsi) return;
-
-      if (initialized.current) {
-        cb?.();
-        return;
-      }
-
-      gsi.initialize({
-        client_id: clientId,
-        callback: (resp: GoogleCredentialResponse) => void handleCredentialResponse(resp),
-        ux_mode: "popup",
-        auto_select: false,
-      });
-
-      const el = document.getElementById("gsi-btn");
-      if (el && !renderedRef.current && typeof gsi.renderButton === "function") {
-        gsi.renderButton(el, { theme: "outline", size: "large" });
-        renderedRef.current = true;
-        setGsiRendered(true);
-        setTimeout(() => enforceFullWidth(), 50);
-      }
-
-      initialized.current = true;
-      cb?.();
-    },
-    [enforceFullWidth]
-  );
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+    (typeof window !== "undefined"
+      ? (window as any).__NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      : undefined);
 
   const handleCredentialResponse = useCallback(
     async (resp: GoogleCredentialResponse) => {
@@ -148,13 +65,26 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
     [resolvedNext, supabase]
   );
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      initGsi();
-      if (initialized.current) clearInterval(id);
-    }, 250);
-    return () => clearInterval(id);
-  }, [initGsi]);
+  const initGsi = useCallback(() => {
+    if (initialized.current) return;
+    const clientId = getClientId();
+    if (!clientId) {
+      setError("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID");
+      return;
+    }
+    const win = window as unknown as WindowWithGSI;
+    const gsi = win.google?.accounts?.id;
+    if (!gsi) return;
+
+    gsi.initialize({
+      client_id: clientId,
+      callback: handleCredentialResponse,
+      ux_mode: "popup",
+      auto_select: false,
+    });
+
+    initialized.current = true;
+  }, [handleCredentialResponse]);
 
   useEffect(() => {
     initGsi();
@@ -162,16 +92,6 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
 
   return (
     <>
-      <style>{`
-        #gsi-btn button, #gsi-btn [role="button"] {
-          width: 100% !important;
-          max-width: 100% !important;
-          display: flex !important;
-          justify-content: center !important;
-          align-items: center !important;
-        }
-      `}</style>
-
       <Script
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
@@ -179,33 +99,53 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         onError={() => setError("Failed to load Google script")}
       />
 
-      <div id="gsi-btn" className="w-full" />
-
-      {!gsiRendered ? (
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={() => {
-              const win = window as unknown as WindowWithGSI;
-              const gsi = win.google?.accounts?.id;
-              if (!gsi) {
-                setError("Google auth not ready — refresh the page.");
-                return;
-              }
-              if (!initialized.current) {
-                initGsi(() => gsi.prompt?.());
-              } else {
-                gsi.prompt?.();
-              }
-            }}
-            disabled={loading}
-            className="w-full inline-flex items-center justify-center gap-3 rounded-md border border-[#dadce0] bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-70 disabled:cursor-not-allowed transition"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            <span>{loading ? "Signing in…" : "Continue with Google"}</span>
-          </button>
-        </div>
-      ) : null}
+      {/* Our always-full button (Google never injects UI now) */}
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => {
+            const win = window as unknown as WindowWithGSI;
+            const gsi = win.google?.accounts?.id;
+            if (!gsi) {
+              setError("Google auth not ready — refresh and try again.");
+              return;
+            }
+            gsi.prompt?.();
+          }}
+          disabled={loading}
+          className="w-full inline-flex items-center justify-center gap-3 rounded-md border border-[#dadce0] bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-70 disabled:cursor-not-allowed transition"
+        >
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            // Google G icon
+            <svg
+              className="h-5 w-5"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 533.5 544.3"
+              aria-hidden
+            >
+              <path
+                fill="#4285F4"
+                d="M533.5 278.4c0-17.4-1.6-34.1-4.7-50.2H272v95h146.9c-6.4 34.7-25.6 64.1-54.6 83.7l88.4 68.7c51.7-47.7 80.8-118.1 80.8-197.2z"
+              />
+              <path
+                fill="#34A853"
+                d="M272 544.3c73.6 0 135.2-24.3 180.3-66.1l-88.4-68.7c-24.5 16.4-55.9 26.1-91.9 26.1-70.7 0-130.5-47.6-151.9-111.4l-91.7 70.7c44.2 87.5 135.3 149.4 243.6 149.4z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M120.1 324.2c-10.8-32-10.8-66.1 0-98.1l-91.7-70.7C-26.6 219.4-26.6 324.9 28.4 417.2l91.7-70.7z"
+              />
+              <path
+                fill="#EA4335"
+                d="M272 107.7c39.9 0 75.8 13.7 104 40.8l78-78C407.1 24.5 345.6 0 272 0 163.7 0 72.6 61.9 28.4 149.6l91.7 70.7C141.5 155.3 201.3 107.7 272 107.7z"
+              />
+            </svg>
+          )}
+          <span>{loading ? "Signing in…" : "Continue with Google"}</span>
+        </button>
+      </div>
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </>

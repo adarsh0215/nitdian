@@ -19,6 +19,8 @@ import { HOMEPAGE_DATA } from "@/components/home/data";
 import ImageTicker from "@/components/home/ImageTicker";
 import EventSection from "@/components/home/EventSection";
 import Image from "next/image"; // add at the top with other imports
+import PosterPlain from "@/components/home/PosterPlain";
+
 
 export const metadata = {
   title: "Alumni Network — NIT Durgapur",
@@ -55,19 +57,7 @@ export default function Page() {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
       
       {/* Poster */}
-      <div className="flex justify-center">
-        <Image
-          src="/events/poster.jpg"
-          alt="Event Poster"
-          width={400}
-          height={500}
-          className="
-            rounded-xl shadow-lg object-contain
-            max-h-[420px] sm:max-h-[460px] lg:max-h-[480px]
-            w-auto
-          "
-        />
-      </div>
+      <PosterPlain />
 
       {/* Event Card */}
       <div className="flex justify-center">
