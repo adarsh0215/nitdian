@@ -6,12 +6,34 @@ import Script from "next/script";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
+/**
+ * Local GSI types (keeps this file self-contained and avoids `any`)
+ */
+type GoogleCredentialResponse = { credential?: string };
+
+interface GoogleAccountsId {
+  initialize: (opts: {
+    client_id: string;
+    callback: (resp: GoogleCredentialResponse) => void;
+    ux_mode?: "popup" | "redirect";
+  }) => void;
+  renderButton: (el: HTMLElement, options?: Record<string, unknown>) => void;
+  prompt?: (listener?: (notification: unknown) => void) => void;
+}
+
+interface WindowWithGSI extends Window {
+  google?: {
+    accounts?: {
+      id?: GoogleAccountsId;
+    };
+  };
+}
+
 export default function GoogleButtonGSI({ next }: { next?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // State that drives rendering of the fallback button.
-  // When true, the official GSI button has been rendered and the fallback will be hidden.
+  // State that drives whether fallback shows; true after GSI renders official button
   const [gsiRendered, setGsiRendered] = useState(false);
 
   const renderedRef = useRef(false); // idempotence guard for renderButton
@@ -27,13 +49,18 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         const q = sp.get("next");
         if (q && q !== "/" && q.startsWith("/") && !q.startsWith("//")) return q;
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
     return "/dashboard";
   })();
 
   const getClientId = () => {
+    // NOTE: Next.js will inline process.env... into the bundle for NEXT_PUBLIC_ variables.
+    // Keeping the window fallback helps some setups that define the var on the client globally.
     return typeof window !== "undefined"
-      ? (window as any).__NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      ? (window as unknown as Window & { __NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string }).__NEXT_PUBLIC_GOOGLE_CLIENT_ID ??
+          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
       : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   };
 
@@ -46,7 +73,8 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         return;
       }
 
-      const gsi = (window as any).google?.accounts?.id;
+      const win = window as unknown as WindowWithGSI;
+      const gsi = win.google?.accounts?.id;
       if (!gsi) return; // script not loaded yet
 
       if (initialized.current) {
@@ -57,8 +85,9 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
       try {
         gsi.initialize({
           client_id: clientId,
-          callback: (resp: { credential?: string }) => {
-            (handleCredentialResponse as any)(resp);
+          callback: (resp: GoogleCredentialResponse) => {
+            // call the handler
+            void handleCredentialResponse(resp);
           },
           ux_mode: "popup",
         });
@@ -79,6 +108,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         initialized.current = true;
         cb?.();
       } catch (err) {
+        // keep error typed as unknown
         console.error("GSI initialize error", err);
         setError("Failed to initialize Google Identity");
       }
@@ -88,23 +118,24 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
   );
 
   const handleCredentialResponse = useCallback(
-    async (resp: { credential?: string }) => {
+    async (resp: GoogleCredentialResponse) => {
       setError(null);
       setLoading(true);
       try {
         const idToken = resp?.credential;
         if (!idToken) throw new Error("No ID token from Google");
 
-        const { error } = await supabase.auth.signInWithIdToken({
+        const { error: signInError } = await supabase.auth.signInWithIdToken({
           provider: "google",
           token: idToken,
         });
-        if (error) throw error;
+        if (signInError) throw signInError;
 
+        // success — redirect
         window.location.href = resolvedNext;
-      } catch (err: any) {
+      } catch (err) {
         console.error("GSI sign-in failed:", err);
-        setError(err?.message ?? "Sign-in failed");
+        setError(err instanceof Error ? err.message : "Sign-in failed");
       } finally {
         setLoading(false);
       }
@@ -112,7 +143,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
     [resolvedNext, supabase]
   );
 
-  // Periodically try to initialize in case the script loads slightly later
+  // Try to initialize periodically, in case the script loads slightly later
   useEffect(() => {
     const id = setInterval(() => {
       initGsi();
@@ -148,32 +179,29 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
           <button
             type="button"
             onClick={() => {
-              const tryPrompt = () => {
-                const gsi = (window as any).google?.accounts?.id;
-                if (!gsi) {
-                  setError("Google auth not ready — please refresh the page.");
-                  return;
-                }
-                if (!initialized.current) {
-                  initGsi(() => {
-                    try {
-                      (window as any).google.accounts.id.prompt?.();
-                    } catch (e) {
-                      console.error("Prompt error after init", e);
-                      setError("Google prompt failed");
-                    }
-                  });
-                } else {
+              const win = window as unknown as WindowWithGSI;
+              const gsi = win.google?.accounts?.id;
+              if (!gsi) {
+                setError("Google auth not ready — please refresh the page.");
+                return;
+              }
+              if (!initialized.current) {
+                initGsi(() => {
                   try {
                     gsi.prompt?.();
                   } catch (e) {
-                    console.error("Prompt error", e);
+                    console.error("Prompt error after init", e);
                     setError("Google prompt failed");
                   }
+                });
+              } else {
+                try {
+                  gsi.prompt?.();
+                } catch (e) {
+                  console.error("Prompt error", e);
+                  setError("Google prompt failed");
                 }
-              };
-
-              tryPrompt();
+              }
             }}
             disabled={loading}
             className="w-full inline-flex items-center justify-center gap-3 rounded-md border border-[#dadce0] bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-70 disabled:cursor-not-allowed transition"
