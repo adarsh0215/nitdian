@@ -29,9 +29,7 @@ interface WindowWithGSI extends Window {
 export default function GoogleButtonGSI({ next }: { next?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [gsiRendered, setGsiRendered] = useState(false);
-
   const renderedRef = useRef(false);
   const initialized = useRef(false);
   const supabase = supabaseBrowser();
@@ -50,64 +48,43 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
     return "/dashboard";
   })();
 
-  const getClientId = () => {
-    return typeof window !== "undefined"
+  const getClientId = () =>
+    typeof window !== "undefined"
       ? (window as unknown as Window & { __NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string }).__NEXT_PUBLIC_GOOGLE_CLIENT_ID ??
-          process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
       : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  };
 
   const enforceFullWidth = useCallback(() => {
     const el = document.getElementById("gsi-btn");
     if (!el) return false;
-
-    // Find the first button inside gsi-btn (deep search)
     const btn = el.querySelector("button");
     if (!btn) return false;
-
-    // Apply styles to make it full-width and centered
     (btn as HTMLButtonElement).style.width = "100%";
     (btn as HTMLButtonElement).style.maxWidth = "100%";
     (btn as HTMLButtonElement).style.display = "flex";
     (btn as HTMLButtonElement).style.justifyContent = "center";
     (btn as HTMLButtonElement).style.alignItems = "center";
-    (btn as HTMLButtonElement).style.paddingLeft = "0.75rem";
-    (btn as HTMLButtonElement).style.paddingRight = "0.75rem";
     return true;
   }, []);
 
-  // Observe injected nodes and enforce full width when the button appears
   useEffect(() => {
     const container = document.getElementById("gsi-btn");
     if (!container) return;
 
-    // Try immediate enforcement first (if already injected)
-    if (enforceFullWidth()) {
-      return;
-    }
+    if (enforceFullWidth()) return;
 
     const observer = new MutationObserver(() => {
-      if (enforceFullWidth()) {
-        observer.disconnect();
-      }
+      if (enforceFullWidth()) observer.disconnect();
     });
-
     observer.observe(container, { childList: true, subtree: true });
-
     return () => observer.disconnect();
   }, [enforceFullWidth]);
 
   const initGsi = useCallback(
     (cb?: () => void) => {
-      const clientId =
-        typeof window !== "undefined"
-          ? (window as unknown as Window & { __NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string }).__NEXT_PUBLIC_GOOGLE_CLIENT_ID ??
-            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-          : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-
+      const clientId = getClientId();
       if (!clientId) {
         setError("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID (check .env.local / Vercel envs)");
-        console.error("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID");
         return;
       }
 
@@ -131,15 +108,12 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
 
         const el = document.getElementById("gsi-btn");
         if (el && !renderedRef.current) {
-          gsi.renderButton(el as HTMLElement, {
-            theme: "outline",
-            size: "large",
-          });
+          gsi.renderButton(el as HTMLElement, { theme: "outline", size: "large" });
 
           renderedRef.current = true;
           setGsiRendered(true);
 
-          // Right after rendering, try to enforce width (observer will also catch it)
+          // try enforcement shortly after render (observer already watching too)
           setTimeout(() => enforceFullWidth(), 50);
         }
 
@@ -150,7 +124,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         setError("Failed to initialize Google Identity");
       }
     },
-    [enforceFullWidth] // initGsi depends on enforceFullWidth
+    [enforceFullWidth]
   );
 
   const handleCredentialResponse = useCallback(
@@ -192,6 +166,23 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
 
   return (
     <>
+      {/* Inline CSS to force any injected GSI button to be full-width immediately.
+          Targets common injection structures; safe and scoped to #gsi-btn only. */}
+      <style>{`
+        #gsi-btn button,
+        #gsi-btn div > button,
+        #gsi-btn div div > button,
+        #gsi-btn > div > div > button {
+          width: 100% !important;
+          max-width: 100% !important;
+          display: flex !important;
+          justify-content: center !important;
+          align-items: center !important;
+          padding-left: 0.75rem !important;
+          padding-right: 0.75rem !important;
+        }
+      `}</style>
+
       <Script
         src="https://accounts.google.com/gsi/client"
         strategy="afterInteractive"
