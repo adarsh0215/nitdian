@@ -17,12 +17,14 @@ interface GoogleAccountsId {
   prompt?: (listener?: (notification: unknown) => void) => void;
 }
 
+// Add the NEXT_PUBLIC_GOOGLE_CLIENT_ID property here so we don't use `any`
 type WindowWithGSI = Window & {
   google?: {
     accounts?: {
       id?: GoogleAccountsId;
     };
   };
+  __NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string;
 };
 
 export default function GoogleButtonGSI({ next }: { next?: string }) {
@@ -37,7 +39,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
   const getClientId = () =>
     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
     (typeof window !== "undefined"
-      ? (window as any).__NEXT_PUBLIC_GOOGLE_CLIENT_ID
+      ? (window as WindowWithGSI).__NEXT_PUBLIC_GOOGLE_CLIENT_ID
       : undefined);
 
   const handleCredentialResponse = useCallback(
