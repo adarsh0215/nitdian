@@ -6,9 +6,6 @@ import Script from "next/script";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
-/**
- * Local GSI types (keeps this file self-contained and avoids `any`)
- */
 type GoogleCredentialResponse = { credential?: string };
 
 interface GoogleAccountsId {
@@ -33,14 +30,12 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // State that drives whether fallback shows; true after GSI renders official button
   const [gsiRendered, setGsiRendered] = useState(false);
 
-  const renderedRef = useRef(false); // idempotence guard for renderButton
+  const renderedRef = useRef(false);
   const initialized = useRef(false);
   const supabase = supabaseBrowser();
 
-  // Resolve redirect path
   const resolvedNext = (() => {
     try {
       if (next && next !== "/" && next.startsWith("/") && !next.startsWith("//")) return next;
@@ -62,9 +57,54 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
       : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
   };
 
+  const enforceFullWidth = useCallback(() => {
+    const el = document.getElementById("gsi-btn");
+    if (!el) return false;
+
+    // Find the first button inside gsi-btn (deep search)
+    const btn = el.querySelector("button");
+    if (!btn) return false;
+
+    // Apply styles to make it full-width and centered
+    (btn as HTMLButtonElement).style.width = "100%";
+    (btn as HTMLButtonElement).style.maxWidth = "100%";
+    (btn as HTMLButtonElement).style.display = "flex";
+    (btn as HTMLButtonElement).style.justifyContent = "center";
+    (btn as HTMLButtonElement).style.alignItems = "center";
+    (btn as HTMLButtonElement).style.paddingLeft = "0.75rem";
+    (btn as HTMLButtonElement).style.paddingRight = "0.75rem";
+    return true;
+  }, []);
+
+  // Observe injected nodes and enforce full width when the button appears
+  useEffect(() => {
+    const container = document.getElementById("gsi-btn");
+    if (!container) return;
+
+    // Try immediate enforcement first (if already injected)
+    if (enforceFullWidth()) {
+      return;
+    }
+
+    const observer = new MutationObserver(() => {
+      if (enforceFullWidth()) {
+        observer.disconnect();
+      }
+    });
+
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [enforceFullWidth]);
+
   const initGsi = useCallback(
     (cb?: () => void) => {
-      const clientId = getClientId();
+      const clientId =
+        typeof window !== "undefined"
+          ? (window as unknown as Window & { __NEXT_PUBLIC_GOOGLE_CLIENT_ID?: string }).__NEXT_PUBLIC_GOOGLE_CLIENT_ID ??
+            process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+          : process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
       if (!clientId) {
         setError("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID (check .env.local / Vercel envs)");
         console.error("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID");
@@ -73,7 +113,7 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
 
       const win = window as unknown as WindowWithGSI;
       const gsi = win.google?.accounts?.id;
-      if (!gsi) return; // script not loaded yet
+      if (!gsi) return;
 
       if (initialized.current) {
         cb?.();
@@ -84,7 +124,6 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         gsi.initialize({
           client_id: clientId,
           callback: (resp: GoogleCredentialResponse) => {
-            // call the handler
             void handleCredentialResponse(resp);
           },
           ux_mode: "popup",
@@ -92,27 +131,26 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
 
         const el = document.getElementById("gsi-btn");
         if (el && !renderedRef.current) {
-          // Ask GSI to render. We still set container styles so injected element fills width.
           gsi.renderButton(el as HTMLElement, {
             theme: "outline",
             size: "large",
           });
 
-          // mark as rendered (ref for idempotence, state to trigger re-render)
           renderedRef.current = true;
           setGsiRendered(true);
+
+          // Right after rendering, try to enforce width (observer will also catch it)
+          setTimeout(() => enforceFullWidth(), 50);
         }
 
         initialized.current = true;
         cb?.();
       } catch (err) {
-        // keep error typed as unknown
         console.error("GSI initialize error", err);
         setError("Failed to initialize Google Identity");
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [enforceFullWidth] // initGsi depends on enforceFullWidth
   );
 
   const handleCredentialResponse = useCallback(
@@ -129,7 +167,6 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         });
         if (signInError) throw signInError;
 
-        // success — redirect
         window.location.href = resolvedNext;
       } catch (err) {
         console.error("GSI sign-in failed:", err);
@@ -141,7 +178,6 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
     [resolvedNext, supabase]
   );
 
-  // Try to initialize periodically, in case the script loads slightly later
   useEffect(() => {
     const id = setInterval(() => {
       initGsi();
@@ -168,15 +204,10 @@ export default function GoogleButtonGSI({ next }: { next?: string }) {
         }}
       />
 
-      {/* Official Google button rendered here by GSI
-          Tailwind child selector forces Google-inserted element to full width and centered.
-          The injected structure by GSI is usually a div > div > button, so this targets the direct child. */}
-      <div
-        id="gsi-btn"
-        className="w-full [&>div]:w-full [&>div]:flex [&>div]:justify-center"
-      />
+      {/* container for Google-injected button */}
+      <div id="gsi-btn" className="w-full" />
 
-      {/* Fallback button: show ONLY if GSI hasn't rendered the official button yet */}
+      {/* fallback: only visible while GSI hasn't rendered */}
       {!gsiRendered ? (
         <div className="mt-3">
           <button
