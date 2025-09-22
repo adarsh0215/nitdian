@@ -445,6 +445,10 @@ export const COUNTRY_CALLING_CODES = [
 
 export type CountryCallingCode = (typeof COUNTRY_CALLING_CODES)[number];
 
+/* ---------- Default Country (India +91) ---------- */
+export const DEFAULT_COUNTRY: CountryCallingCode = COUNTRY_CALLING_CODES[0];
+
+
 
 
 
