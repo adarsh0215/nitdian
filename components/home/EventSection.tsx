@@ -73,46 +73,51 @@ export default function EventCard({ variant = "compact" }: EventCardProps) {
         </a>
       </div>
 
-      {/* Divider */}
-      <div className="mt-12 border-t border-gray-100" />
+      {/* Payment Section (Hero Only) */}
+      {isHero && (
+        <>
+          <div className="mt-14 border-t border-gray-100" />
 
-      {/* Payment Section */}
-      <div className={`pt-8 ${isHero ? "text-left" : ""}`}>
-        <h3 className="text-sm font-semibold text-gray-900 mb-6">
-          Payment Details
-        </h3>
+          <div className="pt-10 text-left">
+            <h3 className="text-base font-semibold text-gray-900 mb-6 text-center">
+              Payment Details
+            </h3>
 
-        <div className="grid sm:grid-cols-2 gap-x-10 gap-y-4 text-sm text-gray-600">
-          {/* Left */}
-          <div className="space-y-2">
-            <p>
-              <span className="font-medium text-gray-900">Account Holder:</span>{" "}
-              NITDIAN Delhi
-            </p>
-            <p>
-              <span className="font-medium text-gray-900">Account Number:</span>{" "}
-              2413023461
-            </p>
-            <p>
-              <span className="font-medium text-gray-900">IFSC Code:</span>{" "}
-              KKBK0000198
-            </p>
+            <div className="grid sm:grid-cols-2 gap-x-12 gap-y-4 text-sm text-gray-600">
+              <div className="space-y-2">
+                <p>
+                  <span className="font-medium text-gray-900">
+                    Account Holder:
+                  </span>{" "}
+                  NITDIAN Delhi
+                </p>
+                <p>
+                  <span className="font-medium text-gray-900">
+                    Account Number:
+                  </span>{" "}
+                  2413023461
+                </p>
+                <p>
+                  <span className="font-medium text-gray-900">IFSC Code:</span>{" "}
+                  KKBK0000198
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p>
+                  <span className="font-medium text-gray-900">Bank:</span> Kotak
+                  Mahindra Bank Ltd.
+                </p>
+                <p>
+                  <span className="font-medium text-gray-900">Branch:</span>{" "}
+                  M-57, Lajpat Nagar II
+                </p>
+                <p>New Delhi – 110024</p>
+              </div>
+            </div>
           </div>
-
-          {/* Right */}
-          <div className="space-y-2">
-            <p>
-              <span className="font-medium text-gray-900">Bank:</span> Kotak
-              Mahindra Bank Ltd.
-            </p>
-            <p>
-              <span className="font-medium text-gray-900">Branch:</span> M-57,
-              Lajpat Nagar II
-            </p>
-            <p>New Delhi – 110024</p>
-          </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }
