@@ -35,7 +35,11 @@ function Badge({
 }: React.PropsWithChildren<{ icon?: React.ReactNode }>) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border bg-card/60 px-2 py-[3px] text-[11px] text-muted-foreground">
-      {icon ? <span className="inline-flex size-3.5 items-center justify-center">{icon}</span> : null}
+      {icon ? (
+        <span className="inline-flex size-3.5 items-center justify-center">
+          {icon}
+        </span>
+      ) : null}
       {children}
     </span>
   );
@@ -51,7 +55,10 @@ function Progress({ value }: { value: number }) {
       aria-valuemax={100}
       aria-valuenow={v}
     >
-      <div className="h-full bg-primary transition-[width] duration-300" style={{ width: `${v}%` }} />
+      <div
+        className="h-full bg-primary transition-[width] duration-300"
+        style={{ width: `${v}%` }}
+      />
     </div>
   );
 }
@@ -62,10 +69,22 @@ function computeCompletion(profile: Profile) {
     { key: "avatar_url", label: "Photo", done: !!profile.avatar_url },
     { key: "degree", label: "Degree", done: !!profile.degree },
     { key: "branch", label: "Branch", done: !!profile.branch },
-    { key: "graduation_year", label: "Grad year", done: !!profile.graduation_year },
-    { key: "interests", label: "Interests", done: Array.isArray(profile.interests) && profile.interests.length > 0 },
+    {
+      key: "graduation_year",
+      label: "Grad year",
+      done: !!profile.graduation_year,
+    },
+    {
+      key: "interests",
+      label: "Interests",
+      done: Array.isArray(profile.interests) && profile.interests.length > 0,
+    },
     { key: "city", label: "City", done: !!profile.city },
-    { key: "company", label: "Company", done: !!profile.company || !!profile.designation },
+    {
+      key: "company",
+      label: "Company",
+      done: !!profile.company || !!profile.designation,
+    },
   ];
   const done = checks.filter((c) => c.done).length;
   const percent = Math.round((done / checks.length) * 100);
@@ -103,11 +122,15 @@ export default function ProfileCard({ profile }: { profile: Profile }) {
         <div className="grid grid-cols-[auto,1fr,auto] items-center gap-3 sm:gap-4">
           <Avatar className="size-10 sm:size-11 border">
             <AvatarImage alt={name} src={profile.avatar_url ?? ""} />
-            <AvatarFallback className="text-[11px]">{initials || "?"}</AvatarFallback>
+            <AvatarFallback className="text-[11px]">
+              {initials || "?"}
+            </AvatarFallback>
           </Avatar>
 
           <div className="min-w-0">
-            <div className="truncate text-sm font-medium tracking-tight">{name}</div>
+            <div className="truncate text-sm font-medium tracking-tight">
+              {name}
+            </div>
 
             <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
               {work ? (
@@ -133,10 +156,26 @@ export default function ProfileCard({ profile }: { profile: Profile }) {
 
           {/* Right-aligned actions */}
           <div className="flex items-center gap-2">
-            <Badge icon={approved ? <CheckCircle2 className="size-3.5" /> : <Clock className="size-3.5" />}>
+            <Badge
+              icon={
+                approved ? (
+                  <CheckCircle2 className="size-3.5" />
+                ) : (
+                  <Clock className="size-3.5" />
+                )
+              }
+            >
               {approved ? "Approved" : "Pending"}
             </Badge>
-            <Badge icon={isPublic ? <Globe2 className="size-3.5" /> : <Lock className="size-3.5" />}>
+            <Badge
+              icon={
+                isPublic ? (
+                  <Globe2 className="size-3.5" />
+                ) : (
+                  <Lock className="size-3.5" />
+                )
+              }
+            >
               {isPublic ? "Public" : "Private"}
             </Badge>
             <Button asChild size="sm" variant="ghost" className="h-8 px-2">
@@ -151,7 +190,9 @@ export default function ProfileCard({ profile }: { profile: Profile }) {
       {/* BODY — compact, aligned to a tidy rhythm */}
       <CardContent className="p-4 sm:p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Profile completion</span>
+          <span className="text-xs text-muted-foreground">
+            Profile completion
+          </span>
           <span className="text-xs font-medium">{percent}%</span>
         </div>
         <Progress value={percent} />

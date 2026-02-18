@@ -16,6 +16,7 @@ import EventSection from "@/components/home/EventSection"; // <- new import
 // Pending list client component (client-side) that accepts `initialPending` prop.
 // Make sure this file exists at components/PendingListClient.tsx
 import PendingListClient from "@/components/PendingListClient";
+import EventCard from "@/components/home/EventSection";
 
 type MemberMembershipRow = {
   membership_type: string;
@@ -62,7 +63,7 @@ export default async function DashboardPage() {
   const profilePromise = sb
     .from("profiles")
     .select(
-      "id, full_name, onboarded, is_approved, is_public, degree, branch, city, country, graduation_year, company, designation, interests, avatar_url, email"
+      "id, full_name, onboarded, is_approved, is_public, degree, branch, city, country, graduation_year, company, designation, interests, avatar_url, email",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -81,7 +82,8 @@ export default async function DashboardPage() {
     .eq("is_approved", true)
     .neq("id", user.id);
 
-  if (profile?.graduation_year != null) sQuery = sQuery.eq("graduation_year", profile.graduation_year);
+  if (profile?.graduation_year != null)
+    sQuery = sQuery.eq("graduation_year", profile.graduation_year);
 
   const { data: strictMatches } = await sQuery;
   let suggestions = (strictMatches ?? []) as ProfileRow[];
@@ -98,7 +100,11 @@ export default async function DashboardPage() {
   }
 
   const cleanSuggestions = Array.from(
-    new Map((suggestions ?? []).filter((p) => p?.id !== user.id).map((p) => [p.id, p])).values()
+    new Map(
+      (suggestions ?? [])
+        .filter((p) => p?.id !== user.id)
+        .map((p) => [p.id, p]),
+    ).values(),
   );
 
   const { count: batchmateCount } = await sb
@@ -124,7 +130,9 @@ export default async function DashboardPage() {
 
   try {
     // 1) fetch active memberships for this approver (user.email should exist)
-    const approverEmail = (profile?.email ?? user.email ?? null) as string | null;
+    const approverEmail = (profile?.email ?? user.email ?? null) as
+      | string
+      | null;
 
     if (approverEmail) {
       // pull recent memberships for this user_email that are currently active (approximate filtering)
@@ -144,15 +152,25 @@ export default async function DashboardPage() {
         // filter to memberships that are currently active (start_date <= now && (end_date is null or end_date >= now))
         const activeMemberships = memberships.filter((m) => {
           try {
-            const startsOk = !m.start_date || new Date(String(m.start_date)).toISOString() <= nowISO;
-            const endsOk = !m.end_date || new Date(String(m.end_date)).toISOString() >= nowISO;
+            const startsOk =
+              !m.start_date ||
+              new Date(String(m.start_date)).toISOString() <= nowISO;
+            const endsOk =
+              !m.end_date ||
+              new Date(String(m.end_date)).toISOString() >= nowISO;
             return startsOk && endsOk;
           } catch {
             return false;
           }
         });
 
-        const membershipTypes = Array.from(new Set(activeMemberships.map((m) => String(m.membership_type ?? "").trim()))).filter(Boolean);
+        const membershipTypes = Array.from(
+          new Set(
+            activeMemberships.map((m) =>
+              String(m.membership_type ?? "").trim(),
+            ),
+          ),
+        ).filter(Boolean);
 
         if (membershipTypes.length > 0) {
           // 2) fetch privileges for these membership_types
@@ -167,14 +185,22 @@ export default async function DashboardPage() {
           } else {
             const privileges = (privilegesRaw ?? []) as PrivilegeRow[];
 
-            const hasApproveAll = privileges.some((p) => p.privilege === "APPROVE_ONBOARD_ALL" && Boolean(p.execute));
-            const hasApproveBatch = privileges.some((p) => p.privilege === "APPROVE_ONBOARD_BATCH" && Boolean(p.execute));
+            const hasApproveAll = privileges.some(
+              (p) =>
+                p.privilege === "APPROVE_ONBOARD_ALL" && Boolean(p.execute),
+            );
+            const hasApproveBatch = privileges.some(
+              (p) =>
+                p.privilege === "APPROVE_ONBOARD_BATCH" && Boolean(p.execute),
+            );
 
             if (hasApproveAll) {
               // return top N pending profiles (all)
               const { data: pendingAll, error: pErr } = await supabaseAdmin
                 .from("profiles")
-                .select("id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company")
+                .select(
+                  "id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company",
+                )
                 .eq("status", "PENDING")
                 .eq("is_approved", false)
                 .limit(50)
@@ -188,12 +214,17 @@ export default async function DashboardPage() {
             } else if (hasApproveBatch) {
               // approver can approve only their batch: use approver's graduation_year (from profiles)
               const approverYearRaw = profile?.graduation_year ?? null;
-              const approverYear = approverYearRaw !== null && approverYearRaw !== undefined ? Number(approverYearRaw) : null;
+              const approverYear =
+                approverYearRaw !== null && approverYearRaw !== undefined
+                  ? Number(approverYearRaw)
+                  : null;
 
               if (approverYear !== null && !Number.isNaN(approverYear)) {
                 const { data: pendingBatch, error: pErr } = await supabaseAdmin
                   .from("profiles")
-                  .select("id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company")
+                  .select(
+                    "id, full_name, avatar_url, branch, graduation_year, degree, city, country, designation, company",
+                  )
                   .eq("status", "PENDING")
                   .eq("is_approved", false)
                   .eq("graduation_year", approverYear)
@@ -226,22 +257,27 @@ export default async function DashboardPage() {
   }
 
   // --- small safe normalization to ensure ProfileCard gets a numeric graduation_year ---
-  const preparedProfile = profile
-    ? {
-        ...profile,
-        graduation_year:
-          profile.graduation_year !== null && profile.graduation_year !== undefined
-            ? Number(profile.graduation_year)
-            : undefined,
-      }
-    : null;
 
   // --- NORMALIZE initialPending list so graduation_year is numeric (fixes type mismatch for PendingListClient) ---
   const preparedInitialPending = (initialPending ?? []).map((p) => ({
     ...p,
     graduation_year:
-      p.graduation_year !== null && p.graduation_year !== undefined ? Number(p.graduation_year) : undefined,
+      p.graduation_year !== null && p.graduation_year !== undefined
+        ? Number(p.graduation_year)
+        : undefined,
   }));
+
+  const normalizedProfile =
+    profile && typeof profile === "object"
+      ? {
+          ...profile,
+          graduation_year:
+            profile.graduation_year !== null &&
+            profile.graduation_year !== undefined
+              ? Number(profile.graduation_year)
+              : null,
+        }
+      : null;
 
   // ---------------------- render dashboard --------------------------
   return (
@@ -253,21 +289,14 @@ export default async function DashboardPage() {
         </div>
       ) : null}
 
-      {/* Responsive 2-column grid on large screens, single column on mobile */}
-      <div className="grid gap-6 lg:grid-cols-2 items-stretch">
-        <div className="h-full">
-          <EventSection
-            title="Shri Shankracharya Ji Maharaj at NIT Durgapur"
-            subtitle="Motivational Speech on "
-            dates={[{ date: "10 Sept 2025", times: "  5:00 PM" }]}
-            ctaHref="https://www.youtube.com/live/RQ1jRAJV1fg"
-            ctaLabel="Watch live"
-          />
-        </div>
+      {/* Responsive layout: stacked on mobile, 2/3 + 1/3 on desktop */}
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* ================= LEFT: MAIN CONTENT ================= */}
+        <EventCard variant="compact" />
 
-        <div className="h-full">
-          {/* @ts-expect-error: Supabase row may have graduation_year as string; we normalized above to Number */}
-          <ProfileCard profile={preparedProfile ?? (profile as ProfileRow)} />
+        {/* ================= RIGHT: SIDEBAR ================= */}
+        <div className="lg:col-span-1">
+          {normalizedProfile && <ProfileCard profile={normalizedProfile} />}
         </div>
       </div>
 
@@ -283,7 +312,10 @@ export default async function DashboardPage() {
               }
             >
               {cleanSuggestions.length > 0 ? (
-                <ul className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3" role="list">
+                <ul
+                  className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3"
+                  role="list"
+                >
                   {cleanSuggestions.map((p) => (
                     <li key={p.id}>
                       <SuggestionCard
@@ -309,9 +341,12 @@ export default async function DashboardPage() {
       {/* ---------- NEW: Pending Approvals Section (only for approvers) ---------- */}
       {preparedInitialPending.length > 0 ? (
         <div className="space-y-4 lg:col-span-2">
-          <Section title={`Pending Approvals (${preparedInitialPending.length})`} cta={null}>
+          <Section
+            title={`Pending Approvals (${preparedInitialPending.length})`}
+            cta={null}
+          >
             {/* Pass server-side fetched list as initialPending */}
-        
+
             <PendingListClient initialPending={preparedInitialPending} />
           </Section>
         </div>

@@ -1,111 +1,118 @@
-// components/home/EventSection.tsx
-// Center-aligned Event card for dashboard/home — visually consistent with ProfileCard.
-// Defaults: ctaLabel = "Watch live", ctaHref = "/live"
-
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-
-type EventDate = {
-  date: string;
-  times: string;
+type EventCardProps = {
+  variant?: "hero" | "compact";
 };
 
-export default function EventSection({
-  title,
-  subtitle,
-  dates = [],
-  ctaLabel = "Watch live",
-  ctaHref = "/live",
-}: {
-  title: string;
-  subtitle?: string;
-  dates?: EventDate[];
-  ctaLabel?: string;
-  ctaHref?: string;
-}) {
+export default function EventCard({ variant = "compact" }: EventCardProps) {
+  const isHero = variant === "hero";
+
   return (
-    <section aria-labelledby="event-heading" className="py-0 sm:py-0 h-full">
-      <div className="h-full">
-        <article
-          className="relative h-full overflow-hidden rounded-2xl border bg-card p-6 sm:p-8 shadow-sm text-center"
-          role="region"
-          aria-label={title}
-        >
-          {/* Decorative top accent bar instead of left for centered style */}
-          <div
-            className="absolute top-0 left-0 w-full h-1 bg-primary/80 rounded-t-2xl"
-            aria-hidden
-          />
-
-          <div className="relative z-10 h-full flex flex-col items-center">
-            {/* Title & subtitle */}
-            <header className="mb-6">
-              <h3 id="event-heading" className="text-2xl font-bold">
-                {title}
-              </h3>
-              {subtitle ? (
-                <p className="mt-1 text-sm sm:text-base text-muted-foreground">
-                  {subtitle}
-                </p>
-              ) : null}
-              <p className="mt-2 text-base sm:text-lg font-semibold text-primary">
-                Youth Power & Indian Knowledge Tradition
-              </p>
-            </header>
-
-            {/* Dates grid */}
-            <div className="mb-8 w-full space-y-3">
-              {dates.map((d, i) => (
-                <div
-                  key={i}
-                  className="flex flex-col items-center justify-center gap-2 rounded-lg border bg-background/50 px-6 py-4"
-                >
-                  <div className="rounded-md border bg-muted px-3 py-1 text-lg font-medium text-muted-foreground">
-                    {d.date}
-                  </div>
-                  <div className="mt-1 text-xl font-bold whitespace-pre-line">
-                    {d.times}
-                  </div>
-                </div>
-              ))}
-
-              {dates.length === 0 ? (
-                <div className="rounded-lg border bg-background/50 px-4 py-6 text-sm text-muted-foreground">
-                  No schedule available
-                </div>
-              ) : null}
-            </div>
-
-            {/* Description */}
-            <p className="mb-6 text-sm text-muted-foreground">
-              Click the button below to watch the live stream.
-            </p>
-
-            {/* CTA */}
-            {/* CTA */}
-            <div className="mt-auto">
-              <Button asChild size="lg">
-                {ctaHref === "/login" ? (
-                  // Login: same-page navigation
-                  <Link href={ctaHref} aria-label={ctaLabel}>
-                    {ctaLabel}
-                  </Link>
-                ) : (
-                  // Live or external: open in new tab
-                  <Link
-                    href={ctaHref}
-                    aria-label={ctaLabel}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {ctaLabel}
-                  </Link>
-                )}
-              </Button>
-            </div>
-          </div>
-        </article>
+    <div
+      className={`
+        bg-white border border-gray-100
+        ${isHero ? "rounded-3xl shadow-lg p-14 text-center" : "rounded-2xl shadow-sm p-6"}
+      `}
+    >
+      {/* Badge */}
+      <div className={isHero ? "mb-8 flex justify-center" : "mb-4"}>
+        <span className="inline-block text-xs font-semibold bg-black text-white px-3 py-1 rounded-full">
+          Upcoming Alumni Meet
+        </span>
       </div>
-    </section>
+
+      {/* Title */}
+      <h2
+        className={`
+          font-bold text-gray-900 tracking-tight
+          ${isHero ? "text-4xl mb-10" : "text-xl mb-5"}
+        `}
+      >
+        NITDIAN Delhi Get Together
+      </h2>
+
+      {/* Event Info */}
+      <div
+        className={`
+          space-y-3 text-gray-700
+          ${isHero ? "text-lg" : "text-sm"}
+        `}
+      >
+        <p>
+          📅 <strong>Sunday, 22nd February</strong>
+        </p>
+        <p>
+          🕛 <strong>12 Noon – 4 PM</strong>
+        </p>
+        <p>
+          📍 <strong>Panchshila Club, New Delhi</strong>
+        </p>
+      </div>
+
+      {/* Description */}
+      <p
+        className={`
+          text-gray-600 mt-6 leading-relaxed
+          ${isHero ? "max-w-2xl mx-auto text-base" : "text-sm"}
+        `}
+      >
+        Join fellow NIT Durgapur alumni for reconnecting and networking.
+      </p>
+
+      {/* CTA */}
+      <div className={isHero ? "mt-12 flex justify-center" : "mt-6"}>
+        <a
+          href="https://forms.gle/CLgydgkvPh1UgxwF8"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`
+            inline-block bg-black text-white font-medium
+            ${isHero ? "px-8 py-3 rounded-xl text-base" : "px-6 py-2.5 rounded-lg text-sm"}
+            hover:opacity-90 transition
+          `}
+        >
+          Register Now
+        </a>
+      </div>
+
+      {/* Divider */}
+      <div className="mt-12 border-t border-gray-100" />
+
+      {/* Payment Section */}
+      <div className={`pt-8 ${isHero ? "text-left" : ""}`}>
+        <h3 className="text-sm font-semibold text-gray-900 mb-6">
+          Payment Details
+        </h3>
+
+        <div className="grid sm:grid-cols-2 gap-x-10 gap-y-4 text-sm text-gray-600">
+          {/* Left */}
+          <div className="space-y-2">
+            <p>
+              <span className="font-medium text-gray-900">Account Holder:</span>{" "}
+              NITDIAN Delhi
+            </p>
+            <p>
+              <span className="font-medium text-gray-900">Account Number:</span>{" "}
+              2413023461
+            </p>
+            <p>
+              <span className="font-medium text-gray-900">IFSC Code:</span>{" "}
+              KKBK0000198
+            </p>
+          </div>
+
+          {/* Right */}
+          <div className="space-y-2">
+            <p>
+              <span className="font-medium text-gray-900">Bank:</span> Kotak
+              Mahindra Bank Ltd.
+            </p>
+            <p>
+              <span className="font-medium text-gray-900">Branch:</span> M-57,
+              Lajpat Nagar II
+            </p>
+            <p>New Delhi – 110024</p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

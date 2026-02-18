@@ -7,7 +7,9 @@ import type { Brand } from "./types";
 
 function looksLikeImagePath(s?: string) {
   if (!s) return false;
-  return s.startsWith("/") || s.startsWith("http://") || s.startsWith("https://");
+  return (
+    s.startsWith("/") || s.startsWith("http://") || s.startsWith("https://")
+  );
 }
 
 type Props = {
@@ -34,13 +36,15 @@ export default function BrandStrip({
   // Typed CSS var for animation duration
   const trackStyle = React.useMemo<TrackStyle>(
     () => ({ ["--dur"]: `${speedSecs}s` }),
-    [speedSecs]
+    [speedSecs],
   );
 
   return (
     <section className="border-y border-border bg-white">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <p className="text-3xl font-medium text-center mb-8">{caption}</p>
+        <p className="text-3xl font-medium text-black text-center mb-8">
+          {caption}
+        </p>
 
         {/* Ticker rail */}
         <div className="relative group">
@@ -72,11 +76,17 @@ export default function BrandStrip({
               style={trackStyle}
             >
               {loop.map((b, i) => {
-                const src = b.logoUrl ?? (looksLikeImagePath(b.name) ? b.name : undefined);
+                const src =
+                  b.logoUrl ??
+                  (looksLikeImagePath(b.name) ? b.name : undefined);
 
                 const Wrap = ({ children }: { children: React.ReactNode }) =>
                   b.href ? (
-                    <Link href={b.href} aria-label={b.name} className="transition">
+                    <Link
+                      href={b.href}
+                      aria-label={b.name}
+                      className="transition"
+                    >
                       {children}
                     </Link>
                   ) : (
@@ -84,7 +94,11 @@ export default function BrandStrip({
                   );
 
                 return (
-                  <li role="listitem" key={`${b.name}-${i}`} className="shrink-0">
+                  <li
+                    role="listitem"
+                    key={`${b.name}-${i}`}
+                    className="shrink-0"
+                  >
                     {src ? (
                       <Wrap>
                         <div className="relative h-12 sm:h-14 md:h-16 w-[110px] sm:w-[130px] md:w-[50px]">

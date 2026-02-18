@@ -20,7 +20,7 @@ import ImageTicker from "@/components/home/ImageTicker";
 import EventSection from "@/components/home/EventSection";
 import Image from "next/image"; // add at the top with other imports
 import PosterPlain from "@/components/home/PosterPlain";
-
+import EventCard from "@/components/home/EventSection";
 
 export const metadata = {
   title: "Alumni Network — NIT Durgapur",
@@ -52,29 +52,13 @@ export default function Page() {
       {/* Brand strip: logos / partner strip directly under hero */}
       <BrandStrip caption={d.brands.caption} brands={d.brands.items} />
 
-     <section className="py-10 sm:py-14 bg-gray-50">
-  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-stretch">
-      
-      {/* Poster */}
-      <PosterPlain />
+      {/* Event Section: latest event announcement with details and payment info */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <EventCard variant="hero" />
+        </div>
+      </section>
 
-      {/* Event Card */}
-      <div className="flex justify-center">
-        <EventSection
-          title="Shri Shankracharya Ji Maharaj at NIT Durgapur"
-          subtitle="Motivational Speech on"
-          dates={[{ date: "10 Sept 2025", times: "5:00 PM" }]}
-          ctaHref="/login"
-          ctaLabel="Login to watch"
-        />
-      </div>
-
-    </div>
-  </div>
-</section>
-
-      
       {/* Why join / Value grid */}
       <section className="py-10 sm:py-14">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
