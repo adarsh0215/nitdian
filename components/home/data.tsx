@@ -33,7 +33,8 @@ export const HOMEPAGE_DATA = {
 
   hero: {
     headline: "Connect. Collaborate.  Contribute.",
-    subtext: "The official NIT Durgapur International Alumni Network.",
+    subtext:
+      "The official NIT Durgapur International Alumni Network. ( NITDIAN )",
     primary: { label: "Join the Network", href: "/signup" } satisfies Cta,
     secondary: { label: "Sign In", href: "/login" } satisfies Cta,
     microProof: "2,143 alumni and growing",
@@ -190,14 +191,14 @@ export const HOMEPAGE_DATA = {
       },
       {
         quote:
-          "Dear NITDians, NITDIAN Delhi is proud and committed to facilitate a lifetime connection among its alumni members and with our Alma Mater NIT Durgapur and our fraternity across the globe.\n\nThe indelible message of the Nobel Laureate great Rabindranath Tagore - \"Jôdi Tor Dak Shune Keu Naaa...Ase, Tôbe Ekla Chôlo Re\", speaks aloud that nobody can deter you in your determination and daringness if you are out to do selfless service.\n\nI would like to validate that interaction with your fellow alumni and batchmates leads you intrinsically to the best possible opportunity available at every stage of your career. Not only the sharing by seniors helps the junior alumni a lot, the noticeable achievements of the juniors also stimulate seniors in analysing and planning their activities in this lifelong journey.\n\nIt is an honor to connect with each one of you. I seek your support and engagement to take our society forward. Let us stay involved to grow and evolve together.",
+          'Dear NITDians, NITDIAN Delhi is proud and committed to facilitate a lifetime connection among its alumni members and with our Alma Mater NIT Durgapur and our fraternity across the globe.\n\nThe indelible message of the Nobel Laureate great Rabindranath Tagore - "Jôdi Tor Dak Shune Keu Naaa...Ase, Tôbe Ekla Chôlo Re", speaks aloud that nobody can deter you in your determination and daringness if you are out to do selfless service.\n\nI would like to validate that interaction with your fellow alumni and batchmates leads you intrinsically to the best possible opportunity available at every stage of your career. Not only the sharing by seniors helps the junior alumni a lot, the noticeable achievements of the juniors also stimulate seniors in analysing and planning their activities in this lifelong journey.\n\nIt is an honor to connect with each one of you. I seek your support and engagement to take our society forward. Let us stay involved to grow and evolve together.',
         author: "Sandeep Kapoor",
         role: "President,\nNIT Durgapur International Alumni Network (NITDIAN)",
         avatar: "/members/sandeepkapoor.jpg",
         href: "/stories/arvind-choubey",
       },
       {
-        quote: 
+        quote:
           "My Dear Sandeep, It gives me great joy to convey my heartfelt congratulations to you and the entire Delhi Chapter team on the launch of the NITDIAN Delhi Chapter website. \n\n This is a wonderful initiative that will not only keep our alumni associations connected but also open new avenues for collaboration, networking, and friendship among all NITD Alumni in Delhi and beyond. \n\n The Delhi Chapter has always been one of the most energetic and active arms of our alumni family, and this step will surely help carry forward that spirit in a meaningful way. I am excited to see how this platform will bring together experiences, opportunities, and memories, making our community stronger. \n\n Wishing our Associate unit NITDIAN, Delhi Chapter every success in this journey, and looking forward to celebrating many more such milestones together.",
         author: "Tarun Kumar Dutta",
         role: "President, NITDAA",
@@ -208,115 +209,115 @@ export const HOMEPAGE_DATA = {
   },
 
   featuredData: {
-  heading: "Loved by Alumni across Batches",
-  subheading: "Appreciation, Motivation, and Encouragement.",
-  items: [
-    {
-      quote:
-        "Dear NIT Durgapur Alumni, I'm thrilled to see our newly launched website! I believe this platform will strengthen our professional networks and also foster meaningful bonds among our fraternity, better halves, and children. Let's reconnect, share experiences, mentor and build a supportive community.  Together, let's make our NITD family even more vibrant and connected.",
-      author: "Jaya Mazumder Sood",
-      role: "1994 Civil",
-      year: "WSP",
-      avatar: "",
-    },
-    {
-      quote:
-        "...CONGRATULATIONS On the launch of website. I am very happy to be a part ( Chief Patron ) of this NITDIAN DELHI. This website is a bond which will keep all the alumni together and in touch with each other ... One may grow as old or big in life but everyone cherishes his college days... wish those days could comeback. Once again my good wishes to all the alumni members and a big applause for the committee members and the president Sandeep Kapoor ...",
-      author: "Rajinder Bagga",
-      role: "1970 Mechanical",
-      year: "Bagga Link group Delhi",
-      avatar: "",
-    },
-    {
-      quote:
-        "It is heartening to note that NITDIAN Delhi Chapter Website is being launched. The NITD Delhi Chapter was doing a fabulous job of carrying forward the Alumni activities including that of supporting the Alumni members. Now with this Website, it would add new dimension to those efforts and give opportunities for greater reach and deeper engagement...",
-      author: "Ratan Kesh",
-      role: "1993 Mechanical",
-      year: "ED & COO, Bandhan Bank",
-      avatar: "",
-    },
-    {
-      quote:
-        "Not just a forum, but a treasure trove of Expertise, Enablement, Accomplishments, and Aspirations. One of the most virant Alumni community I have seen. Excited to be part of the family …. Together, let's make a difference to the society, positively influencing lives around us.",
-      author: "Ish Kumar",
-      role: "1998 Electrical",
-      year: "Tech Mahindra",
-      avatar: "",
-    },
-    {
-      quote:
-        "...Every story shared, every event attended, and every connection made will strengthen the NITDIAN fabric in Delhi and beyond. We invite all alumni to register, participate, and co-create this journey with us… website is not just a digital presence — it’s a commitment to keeping the NITDIAN spirit alive, wherever we are...",
-      author: "Prasanta Saha",
-      role: "2014 Mechanical",
-      year: "EY",
-      avatar: "",
-    },
-    {
-      quote:
-        "With heartfelt gratitude to our alma mater, NIT Durgapur, for nurturing us with the roots to rise – NITDIAN Delhi now steps into the digital era. This platform will unite alumni and add value through technical exchange, social connect, mentorship, and career growth.",
-      author: "Rupak Mandal",
-      role: "2011 Mechanical",
-      year: "Bharti Real Estate",
-      avatar: "",
-    },
-    {
-      quote: "Four years of Durgapur - Four decades of Engineering. Nothing less, nothing more",
-      author: "Hitendra Dev Sakya",
-      role: "1988 Electrical",
-      year: "MD Nepal Electricity Authority",
-      avatar: "",
-    },
-    {
-      quote:
-        "..It gives me immense pleasure to know the launch of our much awaited official alumni website – a dedicated platform to strengthen the bond between our institution and its proud alumni across the globe.... Let’s visit the website, explore its features, and stay connected with the ever-growing alumni community as our active participation and contributions will make this platform vibrant and meaningful...",
-      author: "Harish Saran",
-      role: "1987 Electrical",
-      year: "MD Hindustan Power Exchange Ltd",
-      avatar: "",
-    },
-    {
-      quote:
-        "58 years back, scores of wide eyed boys from different states converged to RECD to be exposed to the kaleidiscopic world of friends, fun, frolic and fear. Those were turbulent times. Still we managed to remain afloat and contribute to Nation building",
-      author: "Subir Adhicary",
-      role: "1967 Civil",
-      year: "\u00A0",
-      avatar: "",
-    },
-    {
-      quote:
-        "To me NITDIAN or NIT DGP Alumni Fraternity is my Extended Family and source of Knowledge, Inspiration, Nostalgia and sometimes Courage too, Also a medium to give back(In whatever small ways i can) to the alumni community in particular but society at large.",
-      author: "Sumit Pawar",
-      role: "2008 CSE",
-      year: "\u00A0",
-      avatar: "",
-    },
-    {
-      quote:
-        "I am proud to be an NITDian.... The biggest contribution of the institute was to build a selfless intimate bonding of Alumnus globally.  Extremely elated to learn New Website launching event by NITDIAN DELHI Alumni Association, who are amongst the most active Alumni Bodies. This launch will make NITDIAN DELHI more visible, specifically for the new Alumnus. My best wishes and regards…",
-      author: "Jayanta Biswas",
-      role: "1984 Mechanical",
-      year: "\u00A0",
-      avatar: "",
-    },
-    {
-      quote:
-        "RECD/NITD Allumni is  a Great  Body of  Ex _Students  UNIT. Lot of Activities  take place Throughout the Year. I am proud  to be Member of this Allumni.I wish  the best Success of this  Allumni  towards Nation Building.",
-      author: "Malay Kisor Lahiri",
-      role: "1972 Electrical",
-      year: "\u00A0",
-      avatar: "",
-    },
-    {
-      quote:
-        "The alumni is the pride and strength of our institution. Thank you for staying connected, giving back, and carrying forward the legacy of our community with such grace and distinction",
-      author: "Ashish Sharma",
-      role: "2011 IT",
-      year: "\u00A0",
-      avatar: "",
-    },
-  ] satisfies FeaturedItem[],
-},
-
+    heading: "Loved by Alumni across Batches",
+    subheading: "Appreciation, Motivation, and Encouragement.",
+    items: [
+      {
+        quote:
+          "Dear NIT Durgapur Alumni, I'm thrilled to see our newly launched website! I believe this platform will strengthen our professional networks and also foster meaningful bonds among our fraternity, better halves, and children. Let's reconnect, share experiences, mentor and build a supportive community.  Together, let's make our NITD family even more vibrant and connected.",
+        author: "Jaya Mazumder Sood",
+        role: "1994 Civil",
+        year: "WSP",
+        avatar: "",
+      },
+      {
+        quote:
+          "...CONGRATULATIONS On the launch of website. I am very happy to be a part ( Chief Patron ) of this NITDIAN DELHI. This website is a bond which will keep all the alumni together and in touch with each other ... One may grow as old or big in life but everyone cherishes his college days... wish those days could comeback. Once again my good wishes to all the alumni members and a big applause for the committee members and the president Sandeep Kapoor ...",
+        author: "Rajinder Bagga",
+        role: "1970 Mechanical",
+        year: "Bagga Link group Delhi",
+        avatar: "",
+      },
+      {
+        quote:
+          "It is heartening to note that NITDIAN Delhi Chapter Website is being launched. The NITD Delhi Chapter was doing a fabulous job of carrying forward the Alumni activities including that of supporting the Alumni members. Now with this Website, it would add new dimension to those efforts and give opportunities for greater reach and deeper engagement...",
+        author: "Ratan Kesh",
+        role: "1993 Mechanical",
+        year: "ED & COO, Bandhan Bank",
+        avatar: "",
+      },
+      {
+        quote:
+          "Not just a forum, but a treasure trove of Expertise, Enablement, Accomplishments, and Aspirations. One of the most virant Alumni community I have seen. Excited to be part of the family …. Together, let's make a difference to the society, positively influencing lives around us.",
+        author: "Ish Kumar",
+        role: "1998 Electrical",
+        year: "Tech Mahindra",
+        avatar: "",
+      },
+      {
+        quote:
+          "...Every story shared, every event attended, and every connection made will strengthen the NITDIAN fabric in Delhi and beyond. We invite all alumni to register, participate, and co-create this journey with us… website is not just a digital presence — it’s a commitment to keeping the NITDIAN spirit alive, wherever we are...",
+        author: "Prasanta Saha",
+        role: "2014 Mechanical",
+        year: "EY",
+        avatar: "",
+      },
+      {
+        quote:
+          "With heartfelt gratitude to our alma mater, NIT Durgapur, for nurturing us with the roots to rise – NITDIAN Delhi now steps into the digital era. This platform will unite alumni and add value through technical exchange, social connect, mentorship, and career growth.",
+        author: "Rupak Mandal",
+        role: "2011 Mechanical",
+        year: "Bharti Real Estate",
+        avatar: "",
+      },
+      {
+        quote:
+          "Four years of Durgapur - Four decades of Engineering. Nothing less, nothing more",
+        author: "Hitendra Dev Sakya",
+        role: "1988 Electrical",
+        year: "MD Nepal Electricity Authority",
+        avatar: "",
+      },
+      {
+        quote:
+          "..It gives me immense pleasure to know the launch of our much awaited official alumni website – a dedicated platform to strengthen the bond between our institution and its proud alumni across the globe.... Let’s visit the website, explore its features, and stay connected with the ever-growing alumni community as our active participation and contributions will make this platform vibrant and meaningful...",
+        author: "Harish Saran",
+        role: "1987 Electrical",
+        year: "MD Hindustan Power Exchange Ltd",
+        avatar: "",
+      },
+      {
+        quote:
+          "58 years back, scores of wide eyed boys from different states converged to RECD to be exposed to the kaleidiscopic world of friends, fun, frolic and fear. Those were turbulent times. Still we managed to remain afloat and contribute to Nation building",
+        author: "Subir Adhicary",
+        role: "1967 Civil",
+        year: "\u00A0",
+        avatar: "",
+      },
+      {
+        quote:
+          "To me NITDIAN or NIT DGP Alumni Fraternity is my Extended Family and source of Knowledge, Inspiration, Nostalgia and sometimes Courage too, Also a medium to give back(In whatever small ways i can) to the alumni community in particular but society at large.",
+        author: "Sumit Pawar",
+        role: "2008 CSE",
+        year: "\u00A0",
+        avatar: "",
+      },
+      {
+        quote:
+          "I am proud to be an NITDian.... The biggest contribution of the institute was to build a selfless intimate bonding of Alumnus globally.  Extremely elated to learn New Website launching event by NITDIAN DELHI Alumni Association, who are amongst the most active Alumni Bodies. This launch will make NITDIAN DELHI more visible, specifically for the new Alumnus. My best wishes and regards…",
+        author: "Jayanta Biswas",
+        role: "1984 Mechanical",
+        year: "\u00A0",
+        avatar: "",
+      },
+      {
+        quote:
+          "RECD/NITD Allumni is  a Great  Body of  Ex _Students  UNIT. Lot of Activities  take place Throughout the Year. I am proud  to be Member of this Allumni.I wish  the best Success of this  Allumni  towards Nation Building.",
+        author: "Malay Kisor Lahiri",
+        role: "1972 Electrical",
+        year: "\u00A0",
+        avatar: "",
+      },
+      {
+        quote:
+          "The alumni is the pride and strength of our institution. Thank you for staying connected, giving back, and carrying forward the legacy of our community with such grace and distinction",
+        author: "Ashish Sharma",
+        role: "2011 IT",
+        year: "\u00A0",
+        avatar: "",
+      },
+    ] satisfies FeaturedItem[],
+  },
 
   howSection: {
     heading: "How it works",
@@ -349,11 +350,9 @@ export const HOMEPAGE_DATA = {
   footer: {
     linksLeft: [
       { label: "Terms and conditions", href: "/policies/terms" },
-  
     ] satisfies FooterLink[],
     linksRight: [
       { label: "Privacy Policy & Data Policy", href: "/policies/privacy" },
-     
     ] satisfies FooterLink[],
     socials: [
       { label: "Contact us", href: "mailto:nitdiandelhi@gmail.com" },

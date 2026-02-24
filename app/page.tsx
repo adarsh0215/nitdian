@@ -21,9 +21,10 @@ import EventSection from "@/components/home/EventSection";
 import Image from "next/image"; // add at the top with other imports
 import PosterPlain from "@/components/home/PosterPlain";
 import EventCard from "@/components/home/EventSection";
+import GalleryCarousel from "@/components/home/GalleryCarousel";
 
 export const metadata = {
-  title: "Alumni Network — NIT Durgapur",
+  title: "NITDIAN",
   description: "Connect, grow, and give back — the alumni advantage.",
 };
 
@@ -53,9 +54,63 @@ export default function Page() {
       <BrandStrip caption={d.brands.caption} brands={d.brands.items} />
 
       {/* Event Section: latest event announcement with details and payment info */}
-      <section className="py-16 bg-gray-50">
+      {/* <section className="py-16 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <EventCard variant="hero" />
+        </div>
+      </section> */}
+
+      {/* Gallery Section */}
+      <section className="py-24 bg-background">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Section Heading */}
+          <div className="text-center mb-12">
+            <h2 className="mb-3">Alumni Moments – Delhi Chapter Meet 2026</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              A glimpse into the unforgettable alumni gathering held on 22nd
+              February 2026.
+            </p>
+          </div>
+
+          {/* Appreciation Message Card */}
+          <div className="bg-card border border-border rounded-3xl p-8 md:p-10 mb-16 shadow-sm">
+            <div className="max-w-3xl mx-auto text-card-foreground leading-relaxed space-y-5">
+              <p className="font-medium">Dear NITDIANs / RECOLIONs,</p>
+
+              <p className="text-muted-foreground">
+                There was an outstanding alumni participation along with their
+                family members in the alumni event organised by NITDian Delhi
+                chapter alumni association on 22nd February 2026. There was an
+                outstanding alumni participation along with their family members
+                in the alumni event organised by NITDian Delhi chapter alumni
+                association on 22nd February 2026.
+              </p>
+
+              <p className="text-muted-foreground">
+                It was heartening to see many alumni joining for the first time,
+                especially younger alumni of the batches 2020 and beyond.
+                Together, we celebrated our bonds in lively interactions and
+                inspiring talks filled with energy and enthusiasm, about the
+                alumni achievements during the recent past, that turned the meet
+                into lasting memories.
+              </p>
+
+              <p className="text-muted-foreground">
+                More than a hundred alumni and their families who attended,
+                deserve special appreciation.
+              </p>
+
+              <div className="pt-6 border-t border-border text-sm">
+                <p className="text-muted-foreground">With sincere thanks,</p>
+                <p className="mt-2">🙏</p>
+                <p className="font-medium mt-2">Sandeep Kapoor</p>
+                <p className="text-muted-foreground">President</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Carousel */}
+          <GalleryCarousel />
         </div>
       </section>
 
