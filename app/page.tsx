@@ -80,10 +80,7 @@ export default function Page() {
               <p className="text-muted-foreground">
                 There was an outstanding alumni participation along with their
                 family members in the alumni event organised by NITDian Delhi
-                chapter alumni association on 22nd February 2026. There was an
-                outstanding alumni participation along with their family members
-                in the alumni event organised by NITDian Delhi chapter alumni
-                association on 22nd February 2026.
+                chapter alumni association on 22nd February 2026.
               </p>
 
               <p className="text-muted-foreground">
