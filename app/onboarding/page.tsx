@@ -1,15 +1,10 @@
 import { supabaseServer } from "@/lib/supabase/server";
-import OnboardingForm from "@/components/onboarding/OnboardingForm";
+import ProfileForm from "@/components/profile/ProfileForm";
 import { redirect } from "next/navigation";
-import { unstable_noStore as noStore } from "next/cache";
-
 
 export const metadata = { title: "Onboarding" };
-export const dynamic = "force-dynamic";
 
 export default async function OnboardingPage() {
-  noStore();
-
   const supabase = await supabaseServer();
   const {
     data: { user },
@@ -28,7 +23,7 @@ export default async function OnboardingPage() {
 
   return (
     <main className="mx-auto max-w-3xl p-6 space-y-6">
-      <OnboardingForm userEmail={user.email ?? undefined} userId={user.id} />
+      <ProfileForm mode="onboarding" userEmail={user.email ?? undefined} userId={user.id} />
     </main>
   );
 }

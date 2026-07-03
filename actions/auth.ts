@@ -3,45 +3,50 @@
 
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { safeRedirect } from "@/lib/redirects";
 
-type ActionResult = { ok: true; url: string } | { ok: false; error: string };
+export type AuthActionState =
+  | { ok: true; message: string }
+  | { ok: false; error: string }
+  | null;
 
-/** Detect Next.js redirect() thrown value so we rethrow it properly. */
-function isNextRedirectError(err: unknown): boolean {
-  if (!err) return false;
-  if (typeof err === "string") return err.includes("NEXT_REDIRECT");
-  const anyErr = err as Record<string, unknown>;
-  const digest = typeof anyErr?.digest === "string" ? (anyErr.digest as string) : "";
-  const message = typeof anyErr?.message === "string" ? (anyErr.message as string) : "";
-  return digest.includes("NEXT_REDIRECT") || message.includes("NEXT_REDIRECT");
+function credentials(formData: FormData) {
+  return {
+    email: String(formData.get("email") || "").trim(),
+    password: String(formData.get("password") || ""),
+    next: safeRedirect(String(formData.get("next") || "")),
+  };
 }
 
-/**
- * EMAIL + PASSWORD SIGN-UP
- * Runs on the server; if the project requires email confirm, there may be no session yet.
- */
-export async function signUpWithPassword(
-  _prev: unknown,
+/** EMAIL + PASSWORD SIGN-IN. Cookies are written server-side; redirect re-renders everything. */
+export async function signInWithPassword(
+  _prev: AuthActionState,
   formData: FormData
-): Promise<ActionResult> {
-  try {
-    const email = String(formData.get("email") || "").trim();
-    const password = String(formData.get("password") || "");
+): Promise<AuthActionState> {
+  const { email, password, next } = credentials(formData);
+  if (!email || !password) return { ok: false, error: "Email and password are required." };
 
-    if (!email || !password) return { ok: false, error: "Email and password are required." };
+  const supabase = await supabaseServer();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return { ok: false, error: error.message };
 
-    const supabase = await supabaseServer();
+  redirect(next);
+}
 
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return { ok: false, error: error.message };
+/** EMAIL + PASSWORD SIGN-UP. If the project requires email confirmation there is no session yet. */
+export async function signUpWithPassword(
+  _prev: AuthActionState,
+  formData: FormData
+): Promise<AuthActionState> {
+  const { email, password } = credentials(formData);
+  if (!email || !password) return { ok: false, error: "Email and password are required." };
 
-    // If email confirmation is required, there won't be a session yet
-    if (!data.session) redirect("/auth/verify-email");
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) return { ok: false, error: error.message };
 
-    // Otherwise, proceed to onboarding
-    redirect("/onboarding");
-  } catch (e) {
-    if (isNextRedirectError(e)) throw e;
-    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  if (!data.session) {
+    return { ok: true, message: "Check your email to confirm your account, then log in." };
   }
+  redirect("/onboarding");
 }

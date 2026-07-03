@@ -1,10 +1,8 @@
 // app/profile/page.tsx
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import ProfileForm from "@/components/profile/ProfileForm";
+import type { OnboardingValues } from "@/lib/validation/onboarding";
 
 
 export default async function ProfilePage() {
@@ -21,6 +19,7 @@ export default async function ProfilePage() {
     .from("profiles")
     .select(`
       id,
+      onboarded,
       email,
       full_name,
       gender,
@@ -42,9 +41,12 @@ export default async function ProfilePage() {
     .eq("id", user.id)
     .maybeSingle();
 
+  // Editing a profile before onboarding makes no sense (was middleware's job)
+  if (!profile?.onboarded) redirect("/onboarding");
+
   // Convert DB nulls → undefined / sensible defaults for the form
   const initial = profile
-    ? {
+    ? ({
         ...profile,
         gender: profile.gender ?? undefined,
         phone_e164: profile.phone_e164 ?? "",
@@ -61,12 +63,14 @@ export default async function ProfilePage() {
         interests: Array.isArray(profile.interests) ? profile.interests : [],
         consent_directory_visible: profile.consent_directory_visible ?? false,
         consent_directory_show_contacts: profile.consent_directory_show_contacts ?? false,
-      }
+        // DB stores plain strings; the form types enum fields as literals — zod re-validates on submit
+      } as Partial<OnboardingValues>)
     : undefined;
 
   return (
     <div className="mx-auto max-w-3xl p-6 space-y-6">
       <ProfileForm
+        mode="edit"
         userEmail={profile?.email ?? user.email ?? undefined}
         userId={user.id}
         initial={initial}

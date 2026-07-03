@@ -3,9 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseRoute } from "@/lib/supabase/route";
 import { safeRedirect } from "@/lib/redirects";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 // Split a potentially comma-joined Set-Cookie header and append to the redirect response.
 function appendSetCookies(from: Response | NextResponse, to: NextResponse) {
   const raw = from.headers.get("set-cookie");

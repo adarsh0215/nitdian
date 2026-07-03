@@ -1,6 +1,7 @@
 // lib/supabase/route.ts
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import type { Database } from "@/lib/supabase/types";
 
 function assertEnv(name: string, value: string | undefined): asserts value is string {
   if (!value) throw new Error(`Missing env: ${name}`);
@@ -25,7 +26,7 @@ export function supabaseRoute(req: NextRequest) {
 
   const response = NextResponse.next();
 
-  const supabase = createServerClient(url, anon, {
+  const supabase = createServerClient<Database>(url, anon, {
     cookies: {
       getAll() {
         // Pass through request cookies

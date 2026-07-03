@@ -2,8 +2,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { supabaseServer } from "@/lib/supabase/server";
-// ⬇️ import BOTH schemas
 import { OnboardingSchema, ProfileSchema } from "@/lib/validation/onboarding";
 
 type Result = { ok: true } | { ok: false; error: string } | null;
@@ -25,7 +25,6 @@ function nOpt(v: FormDataEntryValue | null): number | undefined {
   return Number.isFinite(num) ? num : undefined;
 }
 
-/* ---------- Shared parse from FormData ---------- */
 function parseRawFromFormData(fd: FormData) {
   return {
     // identity
@@ -62,10 +61,11 @@ function parseRawFromFormData(fd: FormData) {
   };
 }
 
-/* ---------- Onboarding (strict) ---------- */
-export async function saveOnboarding(
-  _prevState: Result,
-  fd: FormData
+/* ---------- The one upsert ---------- */
+async function persistProfile(
+  fd: FormData,
+  schema: typeof OnboardingSchema | typeof ProfileSchema,
+  onboarding: boolean
 ): Promise<Result> {
   const sb = await supabaseServer();
   const {
@@ -74,127 +74,73 @@ export async function saveOnboarding(
   } = await sb.auth.getUser();
   if (userErr || !user) return { ok: false, error: "Not authenticated" };
 
-  const raw = parseRawFromFormData(fd);
-  const parsed = OnboardingSchema.safeParse(raw);
+  const parsed = schema.safeParse(parseRawFromFormData(fd));
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => i.message).join(", ");
     return { ok: false, error: msg || "Invalid input" };
   }
   const v = parsed.data;
 
-  const accepted_terms_at = v.consent_terms_privacy ? new Date().toISOString() : null;
-  const is_public = v.consent_directory_visible ?? undefined;
+  const { error } = await sb.from("profiles").upsert(
+    {
+      id: user.id,
+      email: v.email,
+      full_name: v.full_name,
+      gender: v.gender ?? null,
 
-  const { error } = await sb
-    .from("profiles")
-    .upsert(
-      {
-        id: user.id,
-        email: v.email!,
-        full_name: v.full_name!,
-        gender: v.gender ?? null,
+      phone_e164: v.phone_e164 ?? null,
+      city: v.city ?? null,
+      country: v.country ?? null,
 
-        phone_e164: v.phone_e164 ?? null,
-        city: v.city ?? null,
-        country: v.country ?? null,
+      graduation_year: v.graduation_year,
+      degree: v.degree ?? null,
+      branch: v.branch ?? null,
+      roll_number: v.roll_number ?? null,
 
-        graduation_year: v.graduation_year ?? null,
-        degree: v.degree ?? null,
-        branch: v.branch ?? null,
-        roll_number: v.roll_number ?? null,
+      employment_type: v.employment_type ?? null,
+      company: v.company ?? null,
+      designation: v.designation ?? null,
 
-        employment_type: v.employment_type ?? null,
-        company: v.company ?? null,
-        designation: v.designation ?? null,
+      avatar_url: v.avatar_url ?? null,
 
-        avatar_url: v.avatar_url ?? null,
+      interests: v.interests ?? [],
 
-        interests: v.interests ?? [],
+      consent_terms_privacy: v.consent_terms_privacy ?? false,
+      consent_directory_visible: v.consent_directory_visible ?? false,
+      consent_directory_show_contacts: v.consent_directory_show_contacts ?? false,
+      is_public: v.consent_directory_visible ?? false,
 
-        onboarded: true,
-        consent_terms_privacy: v.consent_terms_privacy ?? false,
-        consent_directory_visible: v.consent_directory_visible ?? false,
-        consent_directory_show_contacts: v.consent_directory_show_contacts ?? false,
-        accepted_terms_at,
-
-        ...(is_public !== undefined ? { is_public } : {}),
-      },
-      { onConflict: "id" }
-    )
-    .eq("id", user.id);
-
-  if (error) {
-    return { ok: false, error: error.message || "Failed to save onboarding" };
-  }
-
-  redirect("/dashboard");
-}
-
-/* ---------- Profile (no redirect) ---------- */
-export async function saveProfile(
-  _prevState: Result,
-  fd: FormData
-): Promise<Result> {
-  const sb = await supabaseServer();
-  const {
-    data: { user },
-    error: userErr,
-  } = await sb.auth.getUser();
-  if (userErr || !user) return { ok: false, error: "Not authenticated" };
-
-  const raw = parseRawFromFormData(fd);
-
-  // Use the dedicated ProfileSchema (terms optional; same directory constraint)
-  const parsed = ProfileSchema.safeParse(raw);
-  if (!parsed.success) {
-    const msg = parsed.error.issues.map((i) => i.message).join(", ");
-    return { ok: false, error: msg || "Invalid input" };
-  }
-  const v = parsed.data;
-
-  const is_public = v.consent_directory_visible ?? undefined;
-
-  const { error } = await sb
-    .from("profiles")
-    .upsert(
-      {
-        id: user.id,
-        email: v.email!,
-        full_name: v.full_name!,
-        gender: v.gender ?? null,
-
-        phone_e164: v.phone_e164 ?? null,
-        city: v.city ?? null,
-        country: v.country ?? null,
-
-        graduation_year: v.graduation_year ?? null,
-        degree: v.degree ?? null,
-        branch: v.branch ?? null,
-        roll_number: v.roll_number ?? null,
-
-        employment_type: v.employment_type ?? null,
-        company: v.company ?? null,
-        designation: v.designation ?? null,
-
-        avatar_url: v.avatar_url ?? null,
-
-        interests: v.interests ?? [],
-
-        // keep consents editable
-        consent_terms_privacy: v.consent_terms_privacy ?? false,
-        consent_directory_visible: v.consent_directory_visible ?? false,
-        consent_directory_show_contacts: v.consent_directory_show_contacts ?? false,
-
-        // do NOT touch onboarded / accepted_terms_at on profile edits
-        ...(is_public !== undefined ? { is_public } : {}),
-      },
-      { onConflict: "id" }
-    )
-    .eq("id", user.id);
+      // onboarding flips these once; profile edits never touch them
+      ...(onboarding
+        ? {
+            onboarded: true,
+            accepted_terms_at: v.consent_terms_privacy ? new Date().toISOString() : null,
+          }
+        : {}),
+    },
+    { onConflict: "id" }
+  );
 
   if (error) {
     return { ok: false, error: error.message || "Failed to save profile" };
   }
 
+  // Clear the client router cache so /profile and /dashboard re-render with
+  // the fresh row (a plain action leaves stale payloads live for 30s+).
+  revalidatePath("/profile");
+  revalidatePath("/dashboard");
   return { ok: true };
+}
+
+/* ---------- Actions ---------- */
+export async function saveOnboarding(_prevState: Result, fd: FormData): Promise<Result> {
+  const res = await persistProfile(fd, OnboardingSchema, true);
+  if (res?.ok) redirect("/dashboard");
+  return res;
+}
+
+export async function saveProfile(_prevState: Result, fd: FormData): Promise<Result> {
+  const res = await persistProfile(fd, ProfileSchema, false);
+  if (res?.ok) redirect("/dashboard");
+  return res;
 }

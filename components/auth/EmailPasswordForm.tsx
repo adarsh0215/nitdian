@@ -1,8 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { signUpWithPassword } from "@/actions/auth";
-import { supabaseBrowser } from "@/lib/supabase/client";
+import {
+  signInWithPassword,
+  signUpWithPassword,
+  type AuthActionState,
+} from "@/actions/auth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -10,22 +13,11 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 
-type ActionState = { ok: false; error: string } | null;
-
-/* SubmitButton: allow forcing pending (for client login) while still
-   honoring server-action pending for signup mode */
-function SubmitButton({
-  mode,
-  forcePending = false,
-}: {
-  mode: "login" | "signup";
-  forcePending?: boolean;
-}) {
+function SubmitButton({ mode }: { mode: "login" | "signup" }) {
   const { pending } = useFormStatus();
-  const isPending = forcePending || pending;
   return (
-    <Button type="submit" className="w-full" disabled={isPending} aria-disabled={isPending}>
-      {isPending ? (
+    <Button type="submit" className="w-full" disabled={pending} aria-disabled={pending}>
+      {pending ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           {mode === "login" ? "Signing in..." : "Creating account..."}
@@ -37,16 +29,6 @@ function SubmitButton({
   );
 }
 
-/** Robustly detect Next.js redirect errors thrown by `redirect()` */
-function isNextRedirect(err: unknown): boolean {
-  if (!err) return false;
-  if (typeof err === "string") return err.includes("NEXT_REDIRECT");
-  const anyErr = err as Record<string, unknown>;
-  const digest = typeof anyErr?.digest === "string" ? (anyErr.digest as string) : "";
-  const message = typeof anyErr?.message === "string" ? (anyErr.message as string) : "";
-  return digest.includes("NEXT_REDIRECT") || message.includes("NEXT_REDIRECT");
-}
-
 export default function EmailPasswordForm({
   mode,
   next,
@@ -54,108 +36,19 @@ export default function EmailPasswordForm({
   mode: "login" | "signup";
   next?: string;
 }) {
-  // Server action used ONLY for signup now.
-  const serverAction = signUpWithPassword;
-
-  function isErrorResult(val: unknown): val is { ok: false; error: string } {
-    if (typeof val !== "object" || val === null) return false;
-    const v = val as Record<string, unknown>;
-    return v.ok === false && typeof v.error === "string";
-  }
-
-  // Server action wrapper for SIGNUP mode (unchanged)
-  const action = React.useCallback(
-    async (_state: ActionState, formData: FormData): Promise<ActionState> => {
-      try {
-        if (!formData.get("next")) formData.set("next", next ?? "");
-        const res = await serverAction(null as unknown as never, formData);
-        if (isErrorResult(res)) return res; // show error inline
-        return null; // usually unreachable due to redirect()
-      } catch (err) {
-        if (isNextRedirect(err)) throw err;
-        const message = err instanceof Error ? err.message : "Unexpected error";
-        return { ok: false, error: message };
-      }
-    },
-    [serverAction, next]
+  const [state, formAction] = React.useActionState<AuthActionState, FormData>(
+    mode === "login" ? signInWithPassword : signUpWithPassword,
+    null
   );
-
-  const [state, formAction] = React.useActionState<ActionState, FormData>(action, null);
-
-  // Client login bits
-  const [clientPending, setClientPending] = React.useState(false);
-  const [clientError, setClientError] = React.useState<string | null>(null);
   const [revealed, setRevealed] = React.useState(false);
   const emailId = React.useId();
   const pwId = React.useId();
   const errId = React.useId();
 
-  // Single handler supports both modes:
-  const onSubmit: React.FormEventHandler<HTMLFormElement> = async (e) => {
-    if (mode !== "login") return; // signup handled by server action attribute
-    e.preventDefault();
-    setClientError(null);
-    setClientPending(true);
-
-    try {
-      const form = e.currentTarget;
-      const email = (form.elements.namedItem("email") as HTMLInputElement)?.value.trim();
-      const password = (form.elements.namedItem("password") as HTMLInputElement)?.value;
-      const supabase = supabaseBrowser();
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        setClientError(error.message || "Sign-in failed.");
-        setClientPending(false);
-        return;
-      }
-
-      const session = data.session;
-      if (session) {
-        // ensure tokens are ready
-        await supabase.auth.getSession();
-
-        // Mirror client session → SERVER cookies so the server navbar sees it instantly
-        await fetch("/auth/callback/set", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-          }),
-        });
-      }
-
-      // (Optional) make the pill update immediately on this page before navigation
-      const meta = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
-      const name =
-        (typeof meta.full_name === "string" && meta.full_name) ||
-        (data.user?.email?.split("@")[0] ?? "Member");
-      const avatarUrl = (typeof meta.avatar_url === "string" && meta.avatar_url) || null;
-      window.dispatchEvent(
-        new CustomEvent("profile:updated", {
-          detail: { name, email: data.user?.email ?? "", avatarUrl },
-        })
-      );
-
-      // 🔥 Hard reload to guarantee server sees cookies on first render (no manual refresh)
-      window.location.assign(next ?? "/dashboard");
-      // no further code runs after navigation
-    } catch (err) {
-      setClientError(err instanceof Error ? err.message : "Unexpected error.");
-      setClientPending(false);
-    }
-  };
+  const error = state && !state.ok ? state.error : null;
 
   return (
-    <form
-      // Use server action only for SIGNUP; LOGIN handled by onSubmit
-      action={mode === "signup" ? formAction : undefined}
-      onSubmit={mode === "login" ? onSubmit : undefined}
-      className="space-y-4"
-      noValidate
-    >
+    <form action={formAction} className="space-y-4" noValidate>
       <input type="hidden" name="next" value={next || ""} />
 
       <div className="space-y-2">
@@ -168,8 +61,8 @@ export default function EmailPasswordForm({
           autoComplete="email"
           inputMode="email"
           required
-          aria-invalid={!!state?.error || !!clientError}
-          aria-describedby={state?.error || clientError ? errId : undefined}
+          aria-invalid={!!error}
+          aria-describedby={error ? errId : undefined}
         />
       </div>
 
@@ -185,8 +78,8 @@ export default function EmailPasswordForm({
             minLength={6}
             required
             className="pr-10"
-            aria-invalid={!!state?.error || !!clientError}
-            aria-describedby={state?.error || clientError ? errId : undefined}
+            aria-invalid={!!error}
+            aria-describedby={error ? errId : undefined}
           />
           <button
             type="button"
@@ -218,13 +111,18 @@ export default function EmailPasswordForm({
         .
       </p>
 
-      {state?.error || clientError ? (
+      {error ? (
         <p id={errId} className="text-sm text-destructive" role="alert" aria-live="polite">
-          {clientError || state?.error}
+          {error}
+        </p>
+      ) : null}
+      {state?.ok ? (
+        <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
+          {state.message}
         </p>
       ) : null}
 
-      <SubmitButton mode={mode} forcePending={clientPending} />
+      <SubmitButton mode={mode} />
     </form>
   );
 }

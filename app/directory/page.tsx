@@ -5,6 +5,7 @@ import DirectoryClient, {
   type DirectoryFilters,
 } from "@/components/directory/DirectoryClient";
 import { supabaseServer } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 const PER_PAGE = 24;
 
@@ -61,6 +62,19 @@ export default async function DirectoryPage({
   const filters = parseFilters(sp);
 
   const supabase = await supabaseServer();
+
+  // Members-only area: onboarded + approved (was middleware's job; proxy only checks auth now)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login?next=/directory");
+  const { data: me } = await supabase
+    .from("profiles")
+    .select("onboarded,is_approved")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!me?.onboarded) redirect("/onboarding");
+  if (!me?.is_approved) redirect("/dashboard");
 
   // -------------------------
   // Base query:

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import Field from "./Field";
 import type { OnboardingValues } from "@/lib/validation/onboarding";
-import { COUNTRY_CALLING_CODES } from "@/lib/validation/onboarding";
+import { COUNTRY_CALLING_CODES } from "@/lib/countries";
 
 export default function PhoneE164Field({
   control,

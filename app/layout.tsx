@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { ThemeProvider } from "@/app/providers";
-import NavbarServer from "@/components/layout/NavbarServer";
+import Navbar from "@/components/layout/Navbar";
+import NavbarUser from "@/components/layout/NavbarUser";
 import { Toaster } from "sonner";
-
-
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,9 +22,6 @@ export const metadata: Metadata = {
   description: "Connect. Collaborate. Contribute.",
 };
 
-export const revalidate = 0;           
-export const dynamic = "force-dynamic";
-
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -32,9 +29,15 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
-          <NavbarServer />
+          <Navbar
+            userSlot={
+              <Suspense fallback={<div className="h-8 w-8 rounded-full bg-muted animate-pulse" />}>
+                <NavbarUser />
+              </Suspense>
+            }
+          />
           {children}
-          <Toaster richColors position="top-right" /> {/* 👈 Needed */}
+          <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>
     </html>

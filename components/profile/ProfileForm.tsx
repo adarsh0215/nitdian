@@ -1,7 +1,12 @@
 "use client";
 
+/**
+ * The one profile form. mode="onboarding" (first-time, requires Terms) vs
+ * mode="edit" (prefilled, Terms already accepted). Both server actions
+ * redirect to /dashboard on success.
+ */
+
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -12,91 +17,82 @@ import {
   DEGREES,
   BRANCHES,
   EMPLOYMENT_TYPES,
-  COUNTRIES,
   GENDERS,
   INTERESTS,
 } from "@/lib/validation/onboarding";
-import { saveProfile } from "@/actions/profile";
+import { COUNTRIES } from "@/lib/countries";
+import { saveOnboarding, saveProfile } from "@/actions/profile";
 
 /* shadcn/ui */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-/* Reused field components (from onboarding) */
+/* Field components */
 import Field from "@/components/onboarding/fields/Field";
 import AvatarField from "@/components/onboarding/fields/AvatarField";
 import PhoneE164Field from "@/components/onboarding/fields/PhoneE164Field";
 import SelectEnumField from "@/components/onboarding/fields/SelectEnumField";
 import InterestsGrid from "@/components/onboarding/fields/InterestsGrid";
 import DirectoryConsents from "@/components/onboarding/fields/DirectoryConsents";
+import TermsCheckbox from "@/components/onboarding/fields/TermsCheckbox";
 import SelectYearField from "@/components/onboarding/fields/SelectYearField";
 
-// Derive the action result and add type guards to avoid `any`
 type ActionResult = Awaited<ReturnType<typeof saveProfile>>;
-type OkResult = Extract<NonNullable<ActionResult>, { ok: true }>;
-type ErrResult = Extract<NonNullable<ActionResult>, { ok: false; error: string }>;
 
-function isOkResult(r: ActionResult): r is OkResult {
-  return !!r && typeof (r as { ok?: boolean }).ok === "boolean" && (r as { ok: boolean }).ok === true;
-}
-function isErrResult(r: ActionResult): r is ErrResult {
-  return !!r && typeof (r as { ok?: boolean }).ok === "boolean" && (r as { ok: boolean }).ok === false;
+function isErrResult(r: ActionResult): r is { ok: false; error: string } {
+  return !!r && r.ok === false && typeof r.error === "string";
 }
 
 export default function ProfileForm({
+  mode,
   userEmail,
   userId,
   initial,
 }: {
+  mode: "onboarding" | "edit";
   userEmail?: string;
   userId: string;
   initial?: Partial<OnboardingValues>;
 }) {
-  const router = useRouter();
+  const isOnboarding = mode === "onboarding";
   const resolver = zodResolver(OnboardingSchema) as Resolver<OnboardingValues>;
 
-  // Type guard to narrow interests to the allowed literals
-  const isAllowedInterest = (
-    i: unknown
-  ): i is OnboardingValues["interests"][number] =>
-    (INTERESTS as readonly string[]).includes(String(i));
-
   const defaultValues = React.useMemo<OnboardingValues>(() => {
-    const base = toFormDefaults(userEmail);
+    const isAllowedInterest = (
+      i: unknown,
+    ): i is OnboardingValues["interests"][number] =>
+      (INTERESTS as readonly string[]).includes(String(i));
 
-    const clean = (val: Partial<OnboardingValues> | undefined): Partial<OnboardingValues> =>
-      !val
-        ? {}
-        : {
-            gender: (val.gender ?? undefined) as OnboardingValues["gender"],
-            phone_e164: val.phone_e164 ?? "",
-            city: val.city ?? "",
-            country: val.country ?? "",
-            graduation_year: val.graduation_year ?? undefined,
-            degree: (val.degree ?? undefined) as OnboardingValues["degree"],
-            branch: (val.branch ?? undefined) as OnboardingValues["branch"],
-            roll_number: val.roll_number ?? "",
-            employment_type: (val.employment_type ??
-              undefined) as OnboardingValues["employment_type"],
-            company: val.company ?? "",
-            designation: val.designation ?? "",
-            avatar_url: val.avatar_url ?? undefined,
-            interests: Array.isArray(val.interests)
-              ? (val.interests.filter(isAllowedInterest) as OnboardingValues["interests"])
-              : ([] as OnboardingValues["interests"]),
-            consent_directory_visible: val.consent_directory_visible ?? false,
-            consent_directory_show_contacts: val.consent_directory_show_contacts ?? false,
-          };
+    const base = toFormDefaults(userEmail);
+    if (isOnboarding || !initial) return base;
 
     return {
       ...base,
-      ...clean(initial),
-      email: initial?.email ?? base.email,
-      full_name: initial?.full_name ?? base.full_name,
-      consent_terms_privacy: true, // always true for profile edits
+      gender: (initial.gender ?? undefined) as OnboardingValues["gender"],
+      phone_e164: initial.phone_e164 ?? "",
+      city: initial.city ?? "",
+      country: initial.country ?? "",
+      graduation_year: initial.graduation_year ?? undefined,
+      degree: (initial.degree ?? undefined) as OnboardingValues["degree"],
+      branch: (initial.branch ?? undefined) as OnboardingValues["branch"],
+      roll_number: initial.roll_number ?? "",
+      employment_type: (initial.employment_type ??
+        undefined) as OnboardingValues["employment_type"],
+      company: initial.company ?? "",
+      designation: initial.designation ?? "",
+      avatar_url: initial.avatar_url ?? undefined,
+      interests: Array.isArray(initial.interests)
+        ? (initial.interests.filter(isAllowedInterest) as OnboardingValues["interests"])
+        : ([] as OnboardingValues["interests"]),
+      consent_directory_visible: initial.consent_directory_visible ?? false,
+      consent_directory_show_contacts:
+        initial.consent_directory_show_contacts ?? false,
+      email: initial.email ?? base.email,
+      full_name: initial.full_name ?? base.full_name,
+      consent_terms_privacy: true, // already accepted during onboarding
     };
-  }, [userEmail, initial]);
+  }, [userEmail, initial, isOnboarding]);
 
   const form = useForm<OnboardingValues>({
     resolver,
@@ -105,21 +101,13 @@ export default function ProfileForm({
   });
 
   const [state, formAction] = React.useActionState<ActionResult, FormData>(
-    saveProfile,
-    null as ActionResult
+    isOnboarding ? saveOnboarding : saveProfile,
+    null as ActionResult,
   );
   const [isPending, startTransition] = React.useTransition();
 
-  // Redirect to dashboard after successful save
-  React.useEffect(() => {
-    if (isOkResult(state)) {
-      router.push("/dashboard");
-    }
-  }, [state, router]);
-
   // Focus/scroll to first invalid control on validation error
   React.useEffect(() => {
-    if (!form.formState.errors) return;
     const firstInvalid = document.querySelector<HTMLElement>("[aria-invalid='true']");
     firstInvalid?.focus();
     firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -136,13 +124,10 @@ export default function ProfileForm({
         fd.set(k, String(v));
       }
     });
-    // For profile edits, schema accepts optional; we keep it true for consistency.
-    fd.set("consent_terms_privacy", "true");
-
     startTransition(() => formAction(fd));
   });
 
-  // ids for inputs
+  // ids for inputs (a11y)
   const idFullName = React.useId();
   const idEmail = React.useId();
   const idCity = React.useId();
@@ -158,9 +143,13 @@ export default function ProfileForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Update your profile</CardTitle>
+        <CardTitle>
+          {isOnboarding ? "Complete your profile" : "Update your profile"}
+        </CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Keep your details up to date to help alumni connect with you.
+          {isOnboarding
+            ? "Fill your details to help alumni connect with you."
+            : "Keep your details up to date to help alumni connect with you."}
         </p>
       </CardHeader>
       <CardContent>
@@ -169,7 +158,7 @@ export default function ProfileForm({
 
           {/* Basic info */}
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 min-w-0">
-            {/* Email */}
+            {/* Email (readonly, non-editable) */}
             <div className="sm:col-span-2 min-w-0">
               <Field label="Email" htmlFor={idEmail} required>
                 <Input
@@ -271,7 +260,7 @@ export default function ProfileForm({
               />
             </div>
 
-            {/* Branch + Roll */}
+            {/* Branch + Roll number */}
             <div className="min-w-0">
               <SelectEnumField
                 control={form.control}
@@ -339,7 +328,15 @@ export default function ProfileForm({
           {/* Directory consents */}
           <DirectoryConsents control={form.control} />
 
-          {/* Server action error */}
+          {/* Terms: accepted once, during onboarding */}
+          {isOnboarding && (
+            <TermsCheckbox
+              control={form.control}
+              error={errors.consent_terms_privacy?.message as string | undefined}
+            />
+          )}
+
+          {/* Server action error (auth/RLS/etc.) */}
           {isErrResult(state) && (
             <p className="text-sm text-red-600" role="alert">
               {state.error}
@@ -348,7 +345,11 @@ export default function ProfileForm({
 
           <div className="flex items-center justify-end gap-3">
             <Button type="submit" disabled={isSaving} aria-busy={isSaving}>
-              {isSaving ? "Saving..." : "Save changes"}
+              {isSaving
+                ? "Saving..."
+                : isOnboarding
+                  ? "Save & continue"
+                  : "Save changes"}
             </Button>
           </div>
         </form>
