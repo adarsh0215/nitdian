@@ -16,7 +16,7 @@ declare global {
       prompt_parent_id?: string;
     }) => void;
     renderButton: (element: HTMLElement, options?: Record<string, unknown>) => void;
-    prompt?: (listener?: (notification: any) => void) => void;
+    prompt?: (listener?: (notification: unknown) => void) => void;
   }
 
   interface Window {
