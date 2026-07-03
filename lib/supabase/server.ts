@@ -41,27 +41,19 @@ function toNextCookieOptions(
 /**
  * Server-side supabase client factory.
  *
- * - Uses SUPABASE_SERVICE_ROLE_KEY if present (preferred), otherwise falls back to NEXT_PUBLIC_SUPABASE_ANON_KEY.
- * - Awaits cookies() to obtain the request cookie store (fixes TS/runtime errors).
+ * Always the ANON key: queries run as the cookie-session user so RLS applies.
+ * Service-role access lives only in lib/supabase/admin.ts.
  */
 export async function supabaseServer() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   assertEnv("NEXT_PUBLIC_SUPABASE_URL", url);
-  const keyToUse = serviceKey ?? anon;
-  assertEnv(
-    serviceKey
-      ? "SUPABASE_SERVICE_ROLE_KEY (preferred)"
-      : "NEXT_PUBLIC_SUPABASE_ANON_KEY (fallback)",
-    keyToUse
-  );
+  assertEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", anon);
 
-  // IMPORTANT: await cookies() because in some runtimes cookies() returns a Promise.
   const cookieStore = await cookies();
 
-  return createServerClient(url, keyToUse, {
+  return createServerClient(url, anon, {
     cookies: {
       // Read cookie value
       get(name: string) {

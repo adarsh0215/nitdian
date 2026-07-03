@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/app/providers";
 import NavbarServer from "@/components/layout/NavbarServer";
-import AuthWatcher from "@/components/auth/AuthWatcher";
 import { Toaster } from "sonner";
 
 
@@ -33,8 +32,6 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider>
-          {/* ✅ Now fully client-safe */}
-          <AuthWatcher />
           <NavbarServer />
           {children}
           <Toaster richColors position="top-right" /> {/* 👈 Needed */}

@@ -21,9 +21,6 @@ export type UserPillData = {
   avatarUrl: string | null;
 };
 
-// canonical key (must match AuthWatcher.tsx)
-const LS_LAST_USER_EMAIL = "auth:last_user_email";
-
 export default function UserPill({ name, email, avatarUrl }: UserPillData) {
   const router = useRouter();
   const [signingOut, setSigningOut] = React.useState(false);
@@ -47,139 +44,17 @@ export default function UserPill({ name, email, avatarUrl }: UserPillData) {
     router.push(href);
   };
 
-  function makeEventId() {
-    try {
-      const g = globalThis as typeof globalThis & { crypto?: Crypto };
-      if (g.crypto?.randomUUID) {
-        return g.crypto.randomUUID();
-      }
-    } catch {
-      // ignore
-    }
-    return "evt_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
-  }
-
-  async function sendSignOutPayload(payload: Record<string, unknown>) {
-    const path = "/api/log-event";
-    const url =
-      typeof window !== "undefined" && window.location?.origin
-        ? `${window.location.origin}${path}`
-        : path;
-    const bodyStr = JSON.stringify(payload);
-
-    try {
-      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
-        const blob = new Blob([bodyStr], { type: "application/json" });
-        const ok = navigator.sendBeacon(url, blob);
-        if (ok) return true;
-      }
-    } catch {
-      // swallow
-    }
-
-    try {
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: bodyStr,
-        keepalive: true, // supported in modern browsers
-      } as RequestInit & { keepalive: boolean });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   const onSignOut = async () => {
     if (signingOut) return;
     setSigningOut(true);
     setOpen(false);
 
     try {
-      const lastUserId = localStorage.getItem("auth:last_seen_user_id");
-      // ✅ FIX: read the canonical email key
-      const lastUserEmail = localStorage.getItem(LS_LAST_USER_EMAIL);
-
-      const eventId = makeEventId();
-      const payload = {
-        user_id: lastUserId ?? null,
-        user_email: lastUserEmail ?? null,
-        action: "sign_out",
-        event_id: eventId,
-      };
-
-      try {
-        localStorage.setItem(
-          "auth:last_logged",
-          JSON.stringify({
-            user_id: lastUserId ?? null,
-            action: "sign_out",
-            ts: Date.now(),
-            event_id: eventId,
-          })
-        );
-      } catch {
-        // ignore storage errors
-      }
-
-      console.info("UserPill: sending sign_out log", {
-        user_id: lastUserId,
-        event_id: eventId,
-        user_email: lastUserEmail,
-      });
-
-      try {
-        await sendSignOutPayload(payload);
-      } catch (err) {
-        console.warn("Sign-out logging attempt failed:", err);
-      }
-
-      type SupabaseClientShape = {
-        auth?: { signOut?: (opts?: { scope?: string }) => Promise<unknown> };
-      };
-      type SupabaseFactory = () => SupabaseClientShape | undefined;
-
-      const supabaseClient: SupabaseClientShape | undefined = (() => {
-        try {
-          if (typeof supabaseBrowser === "function") {
-            return (supabaseBrowser as SupabaseFactory)();
-          }
-          return supabaseBrowser as SupabaseClientShape | undefined;
-        } catch {
-          return undefined;
-        }
-      })();
-
-      try {
-        await supabaseClient?.auth?.signOut?.({ scope: "local" });
-      } catch (err) {
-        console.warn("local signOut failed:", err);
-      }
-
-      try {
-        await Promise.allSettled([
-          supabaseClient?.auth?.signOut?.({ scope: "global" }),
-          fetch("/auth/callback/signout", {
-            method: "POST",
-            credentials: "include",
-            cache: "no-store",
-          }),
-        ]);
-      } catch (err) {
-        console.warn("global signOut or server callback failed:", err);
-      }
-
-      window.location.replace("/login");
+      await supabaseBrowser().auth.signOut();
     } catch (err) {
-      console.error("Sign out failed, redirecting anyway:", err);
-      try {
-        window.location.replace("/login");
-      } catch {
-        // final fallback
-      }
-    } finally {
-      setSigningOut(false);
+      console.warn("Sign out failed, redirecting anyway:", err);
     }
+    window.location.replace("/login");
   };
 
   return (
