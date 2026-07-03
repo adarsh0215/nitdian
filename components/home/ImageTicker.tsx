@@ -1,8 +1,4 @@
 // components/home/ImageTicker.tsx
-"use client";
-
-import * as React from "react";
-import { motion } from "framer-motion";
 import Image from "next/image";
 
 type TickerImage = {
@@ -17,29 +13,22 @@ const images: TickerImage[] = [
   { id: 3, src: "/images/gallery/galleryc.jpeg", alt: "Alumni event 3" },
   { id: 4, src: "/images/gallery/galleryd.jpeg", alt: "Alumni event 4" },
   { id: 5, src: "/images/gallery/gallerye.jpeg", alt: "Alumni event 5" },
-  // { id: 6, src: "/images/gallery/gallery6.jpeg", alt: "Alumni event 6" },
 ];
 
 export default function ImageTicker() {
-  // Duplicate the images so it loops smoothly
+  // Duplicate the images so the loop wraps seamlessly at -50%
   const tickerImages = [...images, ...images];
 
   return (
     <div className="w-full overflow-hidden relative">
-      <motion.div
+      <style>{`@keyframes image-ticker { to { transform: translateX(-50%); } }`}</style>
+      <div
         className="flex gap-4"
-        initial={{ x: 0 }}
-        animate={{ x: "-50%" }} // Move half since images are duplicated
-        transition={{
-          repeat: Infinity,
-          ease: "linear",
-          duration: 8, // speed of the ticker
-        }}
+        style={{ animation: "image-ticker 8s linear infinite" }}
       >
-        {tickerImages.map((img) => (
+        {tickerImages.map((img, i) => (
           <div
-            key={`${img.id}-${Math.random()}`}
-
+            key={`${img.id}-${i}`}
             className="
               flex-shrink-0
               w-full
@@ -66,7 +55,7 @@ export default function ImageTicker() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
           </div>
         ))}
-      </motion.div>
+      </div>
     </div>
   );
 }

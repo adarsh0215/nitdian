@@ -2,12 +2,9 @@ import type {
   Brand,
   Cta,
   HowStepItem,
-  QuickActionItem,
   TestimonialItem,
   ValueItem,
   FooterLink,
-  SpotlightEvent, // 👈 needed for items satisfies
-  FeaturedData,
   FeaturedItem,
 } from "./types";
 
@@ -17,7 +14,6 @@ import {
   BriefcaseBusiness,
   Gift,
   UsersRound,
-  Handshake,
   Images,
   LogIn,
   IdCard,
@@ -25,12 +21,6 @@ import {
 } from "lucide-react";
 
 export const HOMEPAGE_DATA = {
-  announcement: {
-    enabled: true,
-    text: "Delhi Chapter Meetup • Sept 14 at India Habitat Centre",
-    cta: { label: "", href: "" } satisfies Cta,
-  },
-
   hero: {
     headline: "Connect. Collaborate.  Contribute.",
     subtext:
@@ -104,78 +94,6 @@ export const HOMEPAGE_DATA = {
       },
     ] satisfies ValueItem[],
   },
-
-  // highlightData: {
-  //   heading: "Spotlight",
-  //   subheading: "What’s happening now in the alumni community.",
-  //   items: [
-  //     {
-  //       quote:
-  //         "Got my next role through an alumni referral. The network made all the difference.",
-  //       author: "Ritwik",
-  //       role: "SDE @ Microsoft",
-  //       icon: BriefcaseBusiness,
-  //     },
-  //     {
-  //       quote:
-  //         "Four years of Durgapur — four decades of engineering. Nothing less, nothing more.",
-  //       author: "Jaya Sood",
-  //       role: "Mech ’87",
-  //       icon: GraduationCap,
-  //     },
-  //     {
-  //       quote:
-  //         "Mentoring juniors keeps me grounded and inspired to give back to the community.",
-  //       author: "Neha Gupta",
-  //       role: "CSE ’15",
-  //       icon: UsersRound,
-  //     },
-  //   ] satisfies HighlightItem[], // 👈 FIX: each item is a HighlightItem
-  // } satisfies HighlightData, // 👈 the whole object matches HighlightData
-
-  quickActionsSection: {
-    heading: "Jump in, fast.",
-    subheading: "Your most-used alumni shortcuts — just one click away.",
-    items: [
-      {
-        title: "Alumni Directory",
-        description:
-          "Browse 280+ NIT Durgapur alumni. Filter by batch, branch, location, or company.",
-        href: "/directory",
-        cta: "Browse Alumni",
-        icon: Users,
-      },
-      {
-        title: "Mentorship Circle",
-        description:
-          "Find mentors or offer guidance — career advice by alumni, for alumni.",
-        href: "/mentorship",
-        cta: "Find Mentors",
-        icon: GraduationCap,
-      },
-      {
-        title: "Jobs & Internships",
-        description:
-          "Discover opportunities shared by NITians working at top firms.",
-        href: "/jobs",
-        cta: "Explore Jobs",
-        icon: BriefcaseBusiness,
-      },
-    ] satisfies QuickActionItem[],
-  },
-
-  // spotlightSection: {
-  //   heading: "",
-  //   subheading: "What’s happening now in the alumni community.",
-  //   event: {
-  //     title: "Tech & Careers Night — Delhi",
-  //     blurb: "Panels, lightning talks, and an alumni hiring hour.",
-  //     date: "Sept 14, 6:00–9:00 PM",
-  //     location: "India Habitat Centre, New Delhi",
-  //     image: "/events/tech-careers-night.jpg",
-  //     cta: { label: "Reserve Seat", href: "/events/tech-careers-night" },
-  //   } satisfies SpotlightEvent,
-  // },
 
   testimonialsSection: {
     heading: "Message from The Leaders",

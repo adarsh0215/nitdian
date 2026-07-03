@@ -7,14 +7,7 @@ import { Button } from "@/components/ui/button";
 import Section from "@/components/dashboard/ui/Section";
 import SuggestionCard from "@/components/dashboard/SuggestionCard";
 import ProfileCard from "@/components/dashboard/ProfileCard";
-// keep the import but silence the unused-vars warning
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import ProfileCompletionCard from "@/components/dashboard/ProfileCompletionCard";
 import { AlertCircle } from "lucide-react";
-import EventSection from "@/components/home/EventSection"; // <- new import
-
-// Pending list client component (client-side) that accepts `initialPending` prop.
-// Make sure this file exists at components/PendingListClient.tsx
 import PendingListClient from "@/components/PendingListClient";
 import EventCard from "@/components/home/EventSection";
 
